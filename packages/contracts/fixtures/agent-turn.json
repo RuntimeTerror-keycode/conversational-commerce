@@ -1,0 +1,8 @@
+{
+  "traceId": "trc_demo_001",
+  "messageId": "wamid.demo001",
+  "customerRef": "919999999999",
+  "text": "2 kg ari und?",
+  "source": "text",
+  "locale": "mixed"
+}

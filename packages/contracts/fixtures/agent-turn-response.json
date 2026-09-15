@@ -1,0 +1,14 @@
+{
+  "traceId": "trc_demo_001",
+  "sessionState": "active",
+  "blocks": [
+    {
+      "type": "list",
+      "body": "Rice ind. Ethu venam?",
+      "rows": [
+        { "id": "p_101", "title": "Jaya rice 5kg", "description": "Rs 320" },
+        { "id": "p_102", "title": "Matta rice 5kg", "description": "Rs 380" }
+      ]
+    }
+  ]
+}
