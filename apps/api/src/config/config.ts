@@ -11,7 +11,7 @@ export class Config {
   private constructor() {
     this.config = {
       nodeEnv: this.getEnv('NODE_ENV', 'development'),
-      port: parseInt(this.getEnv('PORT', '3000'), 10),
+      port: parseInt(this.getEnv('PORT', '4000'), 10),
       logLevel: this.getEnv('LOG_LEVEL', 'info'),
     };
 

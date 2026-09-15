@@ -177,7 +177,7 @@ Scripts that need env vars (`dev`, `start`) are prefixed with `env-cmd` in `pack
 | Variable    | Type   | Default       | Description              |
 | ----------- | ------ | ------------- | ------------------------ |
 | `NODE_ENV`  | string | `development` | Runtime environment      |
-| `PORT`      | number | `3000`        | HTTP server port         |
+| `PORT`      | number | `4000`        | HTTP server port         |
 | `LOG_LEVEL` | string | `info`        | Logging verbosity        |
 
 ---
