@@ -16,14 +16,20 @@ Customers order groceries from local retailers through natural text or voice on 
 | Path | Language | Owns |
 |---|---|---|
 | `apps/edge` | Python / FastAPI | WhatsApp webhook, STT, outbound send |
-| `apps/api` | TypeScript / Mastra | Agent, domain services, dashboard REST |
+| `apps/agent` | TypeScript / Mastra | Conversational agent — `POST /agent/turn` |
+| `apps/api` | TypeScript | Dashboard REST (orders, inventory) |
 | `apps/dashboard` | React | Retailer order + inventory UI |
 | `apps/mcp` | TypeScript | MCP server for Claude/Codex |
 | `packages/contracts` | TS + Python mirror | Shared types |
+| `packages/domain` | TypeScript | Shared domain layer (cart, orders, catalog) — not built yet |
+
+`apps/agent` and `apps/api` are separate deploys owned by different devs. Neither imports the other's `src/`; anything they both need to touch (cart, orders, catalog, retailers) belongs in `packages/domain`, imported by both.
+
+**Open question, not yet resolved:** order status transitions (accept/reject) happen in `apps/api`'s dashboard routes, but `POST /notify` back to the edge (docs/contracts.md §A2) was originally the AI service's job. Since `apps/api` now owns order mutation, it likely owns the `/notify` call too — confirm this before building the notify path, and update docs/contracts.md §A2 and §E once decided.
 
 ## Architecture rules — do not violate without asking
 
-1. **One domain layer, two entry points.** Mastra tools in `apps/api/src/mastra/tools/` contain zero business logic — schema plus a call into `src/domain/`. Dashboard REST routes call the same domain functions. Never write SQL in a tool.
+1. **One domain layer, two entry points.** Mastra tools in `apps/agent/src/mastra/tools/` and dashboard REST routes in `apps/api/src/api/` both call into `packages/domain` — schema/routing only, zero business logic, zero SQL, in either app.
 
 2. **Cart lives in Postgres, never in conversation context.** The agent reads it via `getCart`. `mutateCart` returns the complete cart, not a diff.
 
@@ -35,7 +41,7 @@ Customers order groceries from local retailers through natural text or voice on 
 
 6. **The edge acks Meta before doing any work.** Webhook returns 200, then processes in a background task. Never block the ack on the agent.
 
-7. **Reply blocks are channel-agnostic.** `apps/api` never constructs Meta API JSON. The edge renders.
+7. **Reply blocks are channel-agnostic.** `apps/agent` never constructs Meta API JSON. The edge renders.
 
 8. **Contract changes touch both languages.** Edit `packages/contracts/src/index.ts` and `packages/contracts/python/contracts.py` together, and keep `fixtures/*.json` valid against both.
 
@@ -51,7 +57,8 @@ Customers order groceries from local retailers through natural text or voice on 
 
     make install     # pnpm install + uv sync
     make db          # postgres + pgvector in docker
-    make api         # Mastra dev server (also opens Studio)
+    make agent       # Mastra dev server (also opens Studio)
+    make api         # dashboard REST dev server
     make edge        # FastAPI on :8000
     make dashboard   # Vite dev server
 
@@ -61,4 +68,4 @@ Ship in the order listed at the end of `docs/spec.md`. Steps 1–6 are a complet
 
 ## Context
 
-Kerala, India. Customers write English, Malayalam, and Manglish (Malayalam in Latin script), often mixed in one message. Product search must handle colloquial terms — the hand-seeded alias table in `apps/api/src/domain/catalog/aliases.ts` matters more than the embedding model.
+Kerala, India. Customers write English, Malayalam, and Manglish (Malayalam in Latin script), often mixed in one message. Product search must handle colloquial terms — the hand-seeded alias table in `packages/domain/src/catalog/aliases.ts` matters more than the embedding model.
