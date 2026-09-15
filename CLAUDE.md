@@ -8,6 +8,8 @@ Customers order groceries from local retailers through natural text or voice on 
 - `docs/spec.md` — AI service design, folder structure, tool definitions, build order
 - `docs/contracts.md` — interface contracts between the three services
 - `packages/contracts/src/index.ts` — the authoritative shared types
+- `apps/api/CONVENTIONS.md` — API service architecture, patterns, and code style
+- `apps/api/AGENTS.md` — quick-reference agent instructions for the API service
 
 ## Layout
 
@@ -39,10 +41,11 @@ Customers order groceries from local retailers through natural text or voice on 
 
 ## Conventions
 
-- TypeScript: no `any`, Zod schemas for all tool inputs, Drizzle for DB access
+- TypeScript: no `any`, Zod schemas for all tool inputs, Drizzle for DB access. Class-based architecture in `apps/api` (see `apps/api/CONVENTIONS.md`).
 - Python: Pydantic models at every boundary, `httpx.AsyncClient` for outbound
 - `traceId` threads through everything — generated at the edge, logged as a structured field on every tool call and domain function
 - No secrets in code. Everything through `.env`, mirrored in `.env.example`
+- Pre-commit: Husky runs `tsc --noEmit` in `apps/api`. No linter or formatter.
 
 ## Commands
 
