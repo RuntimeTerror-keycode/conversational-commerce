@@ -3,8 +3,8 @@ import { AgentTurnRequest, type AgentTurnResponse } from "@cc/contracts";
 
 /**
  * Walking-skeleton handler: validates the request against the shared
- * contract and returns a hardcoded reply. No agent, no domain layer yet —
- * this exists so the edge <-> api path can be proven end to end.
+ * contract and returns a hardcoded reply. No Mastra, no domain layer yet —
+ * this exists so the edge <-> agent path can be proven end to end.
  */
 export function agentTurn(req: Request, res: Response) {
   const parsed = AgentTurnRequest.safeParse(req.body);
