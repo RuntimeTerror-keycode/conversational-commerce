@@ -27,17 +27,16 @@ symlink pnpm creates there. It's `.gitignore`'d, same as every other
 
 ## Status
 
-Walking skeleton is in place: a message can travel edge → agent → back to
-edge with no AI in the loop yet.
-
 - `apps/edge` verifies the Meta webhook signature, acks 200 immediately, then
   calls `apps/agent` in a background task and logs the stubbed outbound send.
-- `apps/agent` exposes `POST /agent/turn`, validates against
-  `AgentTurnRequest` from `@cc/contracts`, and returns a hardcoded reply
-  block.
+- `apps/agent` runs a real Mastra `shopping-agent` (full tool set: search,
+  cart, availability, confirmation gate, placeOrder) behind `POST
+  /agent/turn`. Every tool is a stub — fake in-memory data, not
+  `packages/domain` (BE devs' side). Reply blocks are v1: always one `text`
+  block, no `buttons`/`list`/`cart_summary` yet. See `apps/agent/README.md`.
 - `apps/api` exists as a bare skeleton (`GET /health` only) — dashboard
   routes land once `packages/domain` exists.
-- Mastra, the database, and the tool set are not wired up yet.
+- `packages/domain` and Postgres are not wired up yet.
 
 ## Setup
 

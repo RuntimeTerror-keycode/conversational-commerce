@@ -1,0 +1,111 @@
+import { describe, expect, it, vi, beforeEach } from "vitest";
+import request from "supertest";
+
+const generateMock = vi.fn();
+
+vi.mock("../../src/mastra/index.js", () => ({
+  mastra: {
+    getAgentById: () => ({ generate: generateMock }),
+  },
+}));
+
+vi.mock("../../src/mastra/memory/config.js", () => ({
+  storage: {},
+  shoppingMemory: {},
+  scopeFor: (customerId: string, sessionId: string) => ({ resource: `customer:${customerId}`, thread: `session:${sessionId}` }),
+}));
+
+const { createServer } = await import("../../src/server.js");
+
+function fixtureRequest(overrides: Partial<Record<string, unknown>> = {}) {
+  return {
+    traceId: "trc_test_001",
+    messageId: "wamid.test001",
+    customerRef: "919999999999",
+    text: "2 kg ari und?",
+    source: "text",
+    locale: "mixed",
+    ...overrides,
+  };
+}
+
+beforeEach(() => {
+  generateMock.mockReset();
+});
+
+describe("POST /agent/turn", () => {
+  it("wraps the agent's text response in a single text block", async () => {
+    generateMock.mockResolvedValue({
+      text: "Jaya rice 5kg (Rs 320) or Matta rice 5kg (Rs 380) — ethu venam?",
+      toolCalls: [{ payload: { toolName: "searchProducts" } }],
+      steps: [{ toolResults: [{ payload: { toolName: "searchProducts", result: { products: [] } } }] }],
+      usage: { totalTokens: 42 },
+    });
+
+    const app = createServer();
+    const res = await request(app).post("/agent/turn").send(fixtureRequest());
+
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({
+      traceId: "trc_test_001",
+      sessionState: "active",
+      blocks: [{ type: "text", body: expect.stringContaining("Jaya rice") }],
+    });
+  });
+
+  it("reports order_placed when placeOrder succeeded", async () => {
+    generateMock.mockResolvedValue({
+      text: "Order placed! You'll hear from the store shortly.",
+      toolCalls: [{ payload: { toolName: "placeOrder" } }],
+      steps: [
+        {
+          toolResults: [
+            { payload: { toolName: "placeOrder", result: { orderId: "ord_1", status: "placed", etaMinutes: 45 } } },
+          ],
+        },
+      ],
+      usage: {},
+    });
+
+    const app = createServer();
+    const res = await request(app).post("/agent/turn").send(fixtureRequest());
+
+    expect(res.body.sessionState).toBe("order_placed");
+  });
+
+  it("does not report order_placed when placeOrder was rejected by the gate", async () => {
+    generateMock.mockResolvedValue({
+      text: "That confirmation expired — want me to start over?",
+      toolCalls: [{ payload: { toolName: "placeOrder" } }],
+      steps: [
+        {
+          toolResults: [{ payload: { toolName: "placeOrder", result: { error: true, reason: "expired" } } }],
+        },
+      ],
+      usage: {},
+    });
+
+    const app = createServer();
+    const res = await request(app).post("/agent/turn").send(fixtureRequest());
+
+    expect(res.body.sessionState).toBe("active");
+  });
+
+  it("falls back to a plain text block if the agent call throws", async () => {
+    generateMock.mockRejectedValue(new Error("model unavailable"));
+
+    const app = createServer();
+    const res = await request(app).post("/agent/turn").send(fixtureRequest());
+
+    expect(res.status).toBe(200);
+    expect(res.body.blocks).toEqual([{ type: "text", body: "Something went wrong, please try again in a moment." }]);
+  });
+
+  it("still rejects a request missing required fields before touching the agent", async () => {
+    const app = createServer();
+    const res = await request(app).post("/agent/turn").send({ text: "hi" });
+
+    expect(res.status).toBe(400);
+    expect(generateMock).not.toHaveBeenCalled();
+  });
+});
