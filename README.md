@@ -31,7 +31,11 @@ Walking skeleton is in place: a message can travel edge → agent → back to
 edge with no AI in the loop yet.
 
 - `apps/edge` verifies the Meta webhook signature, acks 200 immediately, then
-  calls `apps/agent` in a background task and logs the stubbed outbound send.
+  calls `apps/agent` in a background task. Text, voice (Sarvam STT), location,
+  and button/list replies all become an agent turn. Outbound `ReplyBlock`s
+  are sent through the Meta Cloud API when a token is set, otherwise logged.
+  `POST /notify` renders retailer status updates the same way. `/docs` still
+  exposes the WhatsApp trigger endpoints for sending without a customer message.
 - `apps/agent` exposes `POST /agent/turn`, validates against
   `AgentTurnRequest` from `@cc/contracts`, and returns a hardcoded reply
   block.
