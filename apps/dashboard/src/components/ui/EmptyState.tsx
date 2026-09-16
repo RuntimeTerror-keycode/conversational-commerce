@@ -22,7 +22,7 @@ export function EmptyState({
   return (
     <div
       className={cn(
-        'animate-fade flex flex-col items-center justify-center gap-3 px-6 py-16 text-center',
+        'animate-fade-in flex flex-col items-center justify-center gap-3 px-6 py-16 text-center',
         className,
       )}
     >
@@ -30,7 +30,7 @@ export function EmptyState({
         <div
           className={cn(
             'flex size-10 items-center justify-center rounded-full',
-            tone === 'calm' ? 'bg-done-soft text-done' : 'bg-sunk text-ink-3',
+            tone === 'calm' ? 'bg-success-bg text-success-fg' : 'bg-surface-sunken text-text-muted',
           )}
         >
           {icon}
@@ -38,9 +38,9 @@ export function EmptyState({
       ) : null}
 
       <div className="space-y-1">
-        <p className="font-semibold text-ink">{title}</p>
+        <p className="font-semibold text-text">{title}</p>
         {description ? (
-          <p className="mx-auto max-w-xs text-sm text-ink-3">{description}</p>
+          <p className="mx-auto max-w-xs text-small text-text-muted">{description}</p>
         ) : null}
       </div>
 

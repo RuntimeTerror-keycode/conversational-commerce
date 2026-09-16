@@ -1,123 +1,212 @@
 /* ============================================================
-   Shopkeeper Portal — Design Tokens
-   Derived from the design brief (section 3, Design System).
+   Shopkeeper Portal — Design Tokens (Tailwind v4, CSS-first)
 
-   Colors are stored as space-separated RGB channels so Tailwind's
-   opacity modifiers work: bg-surface/50, text-accent/80, etc.
-   Hex equivalents are noted in comments.
+   Everything Tailwind needs to generate utilities lives in the
+   `@theme` block below — v4 reads these directly, no JS config.
+   Anything that isn't a Tailwind theme namespace (shadows' raw
+   values, motion durations reused across states) stays as a plain
+   `:root` custom property and is consumed via `var(...)`.
 
-   Import once at the top of src/index.css, before @tailwind.
+   Do not add raw hex/px values to component code. Need a new
+   value? Add it here first with a semantic name.
    ============================================================ */
 
-:root {
+@theme {
+  /* Clear Tailwind's default color palette entirely — `bg-blue-500`
+     must not compile. Re-add only the three neutrals every design
+     system needs regardless of brand palette. */
+  --color-*: initial;
+  --color-transparent: transparent;
+  --color-current: currentColor;
+  --color-white: #ffffff;
+
   /* ---------- Brand / accent ---------------------------------
      Brief: Primary #2563EB                                     */
-  --color-accent:          37 99 235;    /* #2563EB */
-  --color-accent-hover:    29 78 216;    /* #1D4ED8 */
-  --color-accent-active:   30 64 175;    /* #1E40AF */
-  --color-accent-subtle:   239 246 255;  /* #EFF6FF  tinted backgrounds */
-  --color-accent-border:   191 219 254;  /* #BFDBFE */
-  --color-on-accent:       255 255 255;  /* #FFFFFF  text on accent fills */
+  --color-accent:         #2563eb;
+  --color-accent-hover:   #1d4ed8;
+  --color-accent-active:  #1e40af;
+  --color-accent-subtle:  #eff6ff;
+  --color-accent-border:  #bfdbfe;
+  --color-on-accent:      #ffffff;
 
   /* ---------- Text -------------------------------------------
      Brief: Text #0F172A, Muted #64748B                         */
-  --color-text-primary:    15 23 42;     /* #0F172A  13.6:1 on white */
-  --color-text-secondary:  71 85 105;    /* #475569   7.4:1 on white */
-  --color-text-muted:      100 116 139;  /* #64748B   4.8:1 — AA body, min size 14px */
-  --color-text-disabled:   148 163 184;  /* #94A3B8   decorative only, never body copy */
-  --color-text-inverse:    248 250 252;  /* #F8FAFC  on dark surfaces */
+  --color-text:           #0f172a; /* 13.6:1 on white */
+  --color-text-secondary: #475569; /*  7.4:1 on white */
+  --color-text-muted:     #64748b; /*  4.8:1 — AA body, min size 14px */
+  --color-text-disabled:  #94a3b8; /* decorative only, never body copy */
+  --color-text-inverse:   #f8fafc; /* on dark surfaces */
 
   /* ---------- Surfaces ---------------------------------------- */
-  --color-canvas:          248 250 252;  /* #F8FAFC  app background */
-  --color-surface:         255 255 255;  /* #FFFFFF  cards, tables, panels */
-  --color-surface-raised:  255 255 255;  /* #FFFFFF  modals, popovers (+ shadow) */
-  --color-surface-sunken:  241 245 249;  /* #F1F5F9  table headers, inset wells */
-  --color-surface-hover:   248 250 252;  /* #F8FAFC  row / list-item hover */
+  --color-canvas:         #f8fafc; /* app background */
+  --color-surface:        #ffffff; /* cards, tables, panels */
+  --color-surface-raised: #ffffff; /* modals, popovers (+ shadow) */
+  --color-surface-sunken: #f1f5f9; /* table headers, inset wells */
+  --color-surface-hover:  #f8fafc; /* row / list-item hover */
 
   /* ---------- Borders ----------------------------------------- */
-  --color-border:          226 232 240;  /* #E2E8F0  default hairline */
-  --color-border-strong:   203 213 225;  /* #CBD5E1  inputs, dividers */
-  --color-border-focus:    37 99 235;    /* #2563EB */
+  --color-border:         #e2e8f0; /* default hairline */
+  --color-border-strong:  #cbd5e1; /* inputs, dividers */
+  --color-border-focus:   #2563eb;
 
   /* ---------- Sidebar (dark navy shell) -----------------------
      Matches the dark navigation rail in the reference mockups.  */
-  --color-sidebar:             15 23 42;     /* #0F172A */
-  --color-sidebar-hover:       30 41 59;     /* #1E293B */
-  --color-sidebar-active:      37 99 235;    /* #2563EB */
-  --color-sidebar-text:        148 163 184;  /* #94A3B8 */
-  --color-sidebar-text-active: 255 255 255;  /* #FFFFFF */
-  --color-sidebar-border:      30 41 59;     /* #1E293B */
+  --color-sidebar:             #0f172a;
+  --color-sidebar-hover:       #1e293b;
+  --color-sidebar-active:      #2563eb;
+  --color-sidebar-text:        #94a3b8;
+  --color-sidebar-text-active: #ffffff;
+  --color-sidebar-border:      #1e293b;
 
   /* ---------- Semantic status --------------------------------
      Brief: Success #10B981, Warning #F59E0B, Error #EF4444.
 
-     IMPORTANT: the -base values below FAIL WCAG AA as text on
-     white (emerald ~2.5:1, amber ~2.1:1). Use -base only for
-     fills, icons >=24px, and progress indicators. For any text
-     or badge label, use the -fg value on the -bg value.         */
+     IMPORTANT: the base values below FAIL WCAG AA as text on
+     white (emerald ~2.5:1, amber ~2.1:1). Use the base value only
+     for fills, icons >=24px, and progress indicators. For any
+     text or badge label, pair -fg on -bg.                       */
+  --color-success:        #10b981; /* fills / icons only */
+  --color-success-bg:     #d1fae5;
+  --color-success-fg:     #047857; /* 6.4:1 on success-bg */
+  --color-success-border: #a7f3d0;
 
-  --color-success:         16 185 129;   /* #10B981  fills / icons only */
-  --color-success-bg:      209 250 229;  /* #D1FAE5 */
-  --color-success-fg:      4 120 87;     /* #047857  6.4:1 on success-bg */
-  --color-success-border:  167 243 208;  /* #A7F3D0 */
+  --color-warning:        #f59e0b; /* fills / icons only */
+  --color-warning-bg:     #fef3c7;
+  --color-warning-fg:     #b45309; /* 5.9:1 on warning-bg */
+  --color-warning-border: #fde68a;
 
-  --color-warning:         245 158 11;   /* #F59E0B  fills / icons only */
-  --color-warning-bg:      254 243 199;  /* #FEF3C7 */
-  --color-warning-fg:      180 83 9;     /* #B45309  5.9:1 on warning-bg */
-  --color-warning-border:  253 230 138;  /* #FDE68A */
+  --color-danger:         #ef4444;
+  --color-danger-hover:   #dc2626;
+  --color-danger-bg:      #fee2e2;
+  --color-danger-fg:      #b91c1c; /* 6.5:1 on danger-bg */
+  --color-danger-border:  #fecaca;
 
-  --color-danger:          239 68 68;    /* #EF4444 */
-  --color-danger-hover:    220 38 38;    /* #DC2626 */
-  --color-danger-bg:       254 226 226;  /* #FEE2E2 */
-  --color-danger-fg:       185 28 28;    /* #B91C1C  6.5:1 on danger-bg */
-  --color-danger-border:   254 202 202;  /* #FECACA */
+  --color-info:           #2563eb; /* reuses accent */
+  --color-info-bg:        #dbeafe;
+  --color-info-fg:        #1d4ed8;
+  --color-info-border:    #bfdbfe;
 
-  --color-info:            37 99 235;    /* #2563EB  reuses accent */
-  --color-info-bg:         219 234 254;  /* #DBEAFE */
-  --color-info-fg:         29 78 216;    /* #1D4ED8 */
-  --color-info-border:     191 219 254;  /* #BFDBFE */
+  /* Violet — "Shipped"/"Out for delivery" badge. Not one of the
+     brief's six swatches; added for completeness. */
+  --color-violet:         #7c3aed;
+  --color-violet-bg:      #ede9fe;
+  --color-violet-fg:      #6d28d9;
+  --color-violet-border:  #ddd6fe;
 
-  /* Violet — used by the "Shipped" badge in the reference row.
-     Not in the brief's six swatches; added for completeness.    */
-  --color-violet:          124 58 237;   /* #7C3AED */
-  --color-violet-bg:       237 233 254;  /* #EDE9FE */
-  --color-violet-fg:       109 40 217;   /* #6D28D9 */
-  --color-violet-border:   221 214 254;  /* #DDD6FE */
+  /* Neutral — "Draft", "Unknown", inactive states */
+  --color-neutral-bg:     #f1f5f9;
+  --color-neutral-fg:     #334155;
+  --color-neutral-border: #e2e8f0;
 
-  /* Neutral — for "Draft", "Unknown", inactive states */
-  --color-neutral-bg:      241 245 249;  /* #F1F5F9 */
-  --color-neutral-fg:      51 65 85;     /* #334155 */
-  --color-neutral-border:  226 232 240;  /* #E2E8F0 */
+  /* ---------- Typography ---------------------------------------
+     Inter, variable weights 400/500/600/700.
+     Brief section 3: H1 32, H2 24, H3 20, Body 16, Small 14,
+     Caption 12. Line-heights, weights and tracking are the parts
+     the brief leaves unspecified and DESIGN_SYSTEM.md fills in. */
+  --font-sans:    'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-numeric: 'Inter', ui-sans-serif, system-ui, sans-serif;
 
-  /* ---------- Focus ring --------------------------------------
-     Applied as a 2px ring with a 2px offset so it reads on both
-     light surfaces and inside dense table rows.                 */
-  --ring-width:  2px;
-  --ring-offset: 2px;
+  --text-caption:                 0.75rem;  /* 12 */
+  --text-caption--line-height:    1rem;
+  --text-caption--font-weight:    500;
+  --text-caption--letter-spacing: 0.01em;
 
-  /* ---------- Elevation ---------------------------------------
-     Low-spread, slate-tinted. Avoid pure-black shadows.         */
+  --text-small:                0.875rem; /* 14 */
+  --text-small--line-height:   1.25rem;
+  --text-small--font-weight:   400;
+
+  --text-body:                 1rem;     /* 16 */
+  --text-body--line-height:    1.5rem;
+  --text-body--font-weight:    400;
+
+  --text-h3:                   1.25rem;  /* 20 */
+  --text-h3--line-height:      1.75rem;
+  --text-h3--font-weight:      600;
+  --text-h3--letter-spacing:   -0.01em;
+
+  --text-h2:                   1.5rem;   /* 24 */
+  --text-h2--line-height:      2rem;
+  --text-h2--font-weight:      600;
+  --text-h2--letter-spacing:   -0.015em;
+
+  --text-h1:                   2rem;     /* 32 */
+  --text-h1--line-height:      2.5rem;
+  --text-h1--font-weight:      700;
+  --text-h1--letter-spacing:   -0.02em;
+
+  /* Metric numerals on dashboard stat cards. */
+  --text-metric:                2.25rem; /* 36 */
+  --text-metric--line-height:   2.5rem;
+  --text-metric--font-weight:   700;
+  --text-metric--letter-spacing: -0.025em;
+
+  /* ---------- Spacing -------------------------------------------
+     v4 generates the whole numeric scale (p-1, gap-2.5, size-10, …)
+     as multiples of this one base unit — 4px, per the brief.
+     Fixed shell dimensions are named tokens on top of that scale. */
+  --spacing: 0.25rem;
+
+  --spacing-sidebar:           15rem; /* 240 */
+  --spacing-sidebar-collapsed: 4rem;  /*  64 */
+  --spacing-topbar:            4rem;  /*  64 */
+
+  /* ---------- Radius ---------------------------------------------
+     Badge/chip 4, input/small button 6, button/dropdown 8,
+     card/panel/table 12, modal 16, avatar full.                 */
+  --radius-sm:   0.25rem;
+  --radius-md:   0.375rem;
+  --radius-lg:   0.5rem;
+  --radius-xl:   0.75rem;
+  --radius-2xl:  1rem;
+
+  /* ---------- Elevation -------------------------------------------
+     Low-spread, slate-tinted. Avoid pure-black shadows. Cards
+     default to a border, not a shadow — see DESIGN_SYSTEM §5.    */
   --shadow-xs: 0 1px 2px 0 rgb(15 23 42 / 0.04);
   --shadow-sm: 0 1px 3px 0 rgb(15 23 42 / 0.08), 0 1px 2px -1px rgb(15 23 42 / 0.04);
   --shadow-md: 0 4px 12px -2px rgb(15 23 42 / 0.08), 0 2px 4px -2px rgb(15 23 42 / 0.04);
   --shadow-lg: 0 12px 24px -4px rgb(15 23 42 / 0.10), 0 4px 8px -4px rgb(15 23 42 / 0.04);
 
-  /* ---------- Motion ------------------------------------------ */
-  --duration-fast: 150ms;  /* color, opacity, hover */
-  --duration-base: 200ms;  /* small layout, dropdowns */
-  --duration-slow: 300ms;  /* modals, drawers, page transitions */
+  /* ---------- Motion ---------------------------------------------
+     fast/base/slow map to Tailwind's stock duration-150/200/300 —
+     no override needed there. Custom easings only.               */
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-in:  cubic-bezier(0.4, 0, 1, 1);
+
+  --animate-shimmer:  shimmer 1.6s infinite;
+  --animate-fade-in:  fade-in 200ms var(--ease-out);
+  --animate-slide-up: slide-up 200ms var(--ease-out);
+
+  /* ---------- Breakpoints ------------------------------------------ */
+  --breakpoint-sm: 23.4375rem; /* 375 */
+  --breakpoint-md: 48rem;      /* 768 */
+  --breakpoint-lg: 80rem;      /* 1280 */
+  --breakpoint-xl: 96rem;      /* 1536 */
+
+  /* ---------- Ring (focus) ------------------------------------------ */
+  --default-ring-width:  2px;
+  --default-ring-color:  var(--color-border-focus);
+}
+
+@keyframes fade-in  { from { opacity: 0; } to { opacity: 1; } }
+@keyframes slide-up { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes shimmer  { 100% { transform: translateX(100%); } }
+
+/* Fixed page-shell max-widths — not a Tailwind theme namespace,
+   consumed via the `max-w-(--width-*)` arbitrary-var syntax. */
+:root {
+  --width-content: 90rem; /* 1440 — dashboard content cap */
+  --width-form:    28rem; /*  448 — login / single-column forms */
+
+  /* Named z-index layers. Tailwind's stock numeric scale (z-10,
+     z-20, z-30, z-40, z-50) already covers dropdown through
+     popover in order; toast sits one above at 60. */
+  --z-toast: 60;
 }
 
 /* Reduced motion — collapse all transitions rather than removing
    them, so state changes still register instantly. */
 @media (prefers-reduced-motion: reduce) {
-  :root {
-    --duration-fast: 0.01ms;
-    --duration-base: 0.01ms;
-    --duration-slow: 0.01ms;
-  }
   *, *::before, *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;

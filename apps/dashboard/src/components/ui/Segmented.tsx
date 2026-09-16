@@ -1,3 +1,4 @@
+import * as Tabs from '@radix-ui/react-tabs';
 import { cn } from '@/lib/cn';
 
 export interface SegmentItem<T extends string> {
@@ -5,7 +6,7 @@ export interface SegmentItem<T extends string> {
   label: string;
   count?: number;
   /** Tints the count pill — used so "New" stays amber wherever it appears. */
-  tone?: 'new' | 'neutral';
+  tone?: 'attention' | 'neutral';
 }
 
 interface SegmentedProps<T extends string> {
@@ -19,7 +20,10 @@ interface SegmentedProps<T extends string> {
  * A sliding pill on an inset track, not underlined tabs.
  *
  * Underlines put a hard rule across the page and make the filter read as a
- * section break; this reads as one control, which is what it is.
+ * section break; this reads as one control, which is what it is. Built on
+ * Radix Tabs for correct roving-tabindex keyboard behaviour, even though
+ * there's no associated Tabs.Content — this is a filter bar, not a panel
+ * switcher.
  */
 export function Segmented<T extends string>({
   items,
@@ -28,50 +32,49 @@ export function Segmented<T extends string>({
   className,
 }: SegmentedProps<T>) {
   return (
-    <div
-      role="tablist"
-      className={cn(
-        'inline-flex items-center gap-0.5 rounded-lg border border-line bg-sunk p-0.5',
-        className,
-      )}
-    >
-      {items.map((item) => {
-        const active = item.value === value;
-        const showNewTone = item.tone === 'new' && (item.count ?? 0) > 0;
+    <Tabs.Root value={value} onValueChange={(next) => onChange(next as T)}>
+      <Tabs.List
+        className={cn(
+          'inline-flex items-center gap-0.5 rounded-lg border border-border bg-surface-sunken p-0.5',
+          className,
+        )}
+      >
+        {items.map((item) => {
+          const active = item.value === value;
+          const showAttentionTone = item.tone === 'attention' && (item.count ?? 0) > 0;
 
-        return (
-          <button
-            key={item.value}
-            type="button"
-            role="tab"
-            aria-selected={active}
-            onClick={() => onChange(item.value)}
-            className={cn(
-              'inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5',
-              'text-sm font-medium transition-all duration-150',
-              active
-                ? 'bg-surface text-ink shadow-xs'
-                : 'text-ink-2 hover:text-ink',
-            )}
-          >
-            {item.label}
-            {item.count !== undefined && item.count > 0 ? (
-              <span
-                className={cn(
-                  'tnum rounded px-1 py-px text-2xs font-semibold tracking-normal',
-                  showNewTone
-                    ? 'bg-new text-white'
-                    : active
-                      ? 'bg-sunk text-ink-2'
-                      : 'bg-line-soft text-ink-3',
-                )}
-              >
-                {item.count}
-              </span>
-            ) : null}
-          </button>
-        );
-      })}
-    </div>
+          return (
+            <Tabs.Trigger
+              key={item.value}
+              value={item.value}
+              className={cn(
+                'inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5',
+                'text-small font-medium transition-all duration-150',
+                'focus-visible:outline-none focus-visible:ring focus-visible:ring-border-focus focus-visible:ring-offset-2',
+                active
+                  ? 'bg-surface text-text shadow-xs'
+                  : 'text-text-secondary hover:text-text',
+              )}
+            >
+              {item.label}
+              {item.count !== undefined && item.count > 0 ? (
+                <span
+                  className={cn(
+                    'font-numeric rounded px-1 py-px text-caption font-semibold tracking-normal',
+                    showAttentionTone
+                      ? 'bg-warning text-white'
+                      : active
+                        ? 'bg-surface-sunken text-text-secondary'
+                        : 'bg-border text-text-muted',
+                  )}
+                >
+                  {item.count}
+                </span>
+              ) : null}
+            </Tabs.Trigger>
+          );
+        })}
+      </Tabs.List>
+    </Tabs.Root>
   );
 }

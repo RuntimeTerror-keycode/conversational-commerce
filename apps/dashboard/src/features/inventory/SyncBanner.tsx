@@ -10,9 +10,9 @@ import { timeAgo } from '@/lib/format';
 export function SyncBanner({ retailer }: { retailer: Retailer }) {
   if (retailer.inventoryMode === 'managed') {
     return (
-      <div className="flex items-center gap-2.5 rounded-lg border border-line-soft bg-surface px-3.5 py-2.5 shadow-xs">
-        <PencilLine className="size-3.5 shrink-0 text-ink-4" aria-hidden />
-        <p className="text-sm text-ink-2">
+      <div className="flex items-center gap-2.5 rounded-lg border border-border bg-surface px-3.5 py-2.5 shadow-xs">
+        <PencilLine className="size-3.5 shrink-0 text-text-disabled" aria-hidden />
+        <p className="text-small text-text-secondary">
           You manage this inventory here — stock comes down automatically as orders
           arrive.
         </p>
@@ -23,13 +23,13 @@ export function SyncBanner({ retailer }: { retailer: Retailer }) {
   const sync = retailer.sync;
 
   return (
-    <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 rounded-lg border border-line-soft bg-surface px-3.5 py-2.5 shadow-xs">
-      <RefreshCw className="size-3.5 shrink-0 text-ink-4" aria-hidden />
-      <p className="text-sm text-ink-2">
-        Synced from <span className="font-medium text-ink">{sync?.provider ?? 'your billing system'}</span>
+    <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 rounded-lg border border-border bg-surface px-3.5 py-2.5 shadow-xs">
+      <RefreshCw className="size-3.5 shrink-0 text-text-disabled" aria-hidden />
+      <p className="text-small text-text-secondary">
+        Synced from <span className="font-medium text-text">{sync?.provider ?? 'your billing system'}</span>
         {sync?.lastSyncedAt ? ` · ${timeAgo(sync.lastSyncedAt)}` : ''}
       </p>
-      <span className="text-xs text-ink-4">Read-only here — edit it in your system.</span>
+      <span className="text-caption text-text-disabled">Read-only here — edit it in your system.</span>
     </div>
   );
 }

@@ -1,7 +1,13 @@
 import type { ApiError } from './types';
-import { fixtureRequest, usingFixtures } from '@/fixtures/adapter';
 
-const baseUrl = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:4000/api';
+/**
+ * No fallback, on purpose. An unset base URL means the app is
+ * misconfigured, not that it should quietly talk to localhost or
+ * serve fake data — `isApiConfigured` gates the whole router on this.
+ */
+const baseUrl = import.meta.env.VITE_API_BASE_URL;
+
+export const isApiConfigured = Boolean(baseUrl);
 
 export class ApiRequestError extends Error {
   readonly status: number;
@@ -57,12 +63,12 @@ function buildPath(path: string, query?: RequestOptions['query']): string {
  * changes.
  */
 export async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
+  if (!baseUrl) {
+    throw new Error('VITE_API_BASE_URL is not set — see ConfigErrorScreen');
+  }
+
   const { method = 'GET', body, query } = options;
   const fullPath = buildPath(path, query);
-
-  if (usingFixtures) {
-    return fixtureRequest<T>(method, fullPath, body);
-  }
 
   const response = await fetch(`${baseUrl}${fullPath}`, {
     method,

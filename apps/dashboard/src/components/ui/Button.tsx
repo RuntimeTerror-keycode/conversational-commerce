@@ -3,7 +3,7 @@ import { Loader2 } from 'lucide-react';
 import { cn } from '@/lib/cn';
 
 type Variant = 'primary' | 'secondary' | 'ghost' | 'danger';
-type Size = 'xs' | 'sm' | 'md';
+type Size = 'sm' | 'md' | 'lg';
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: Variant;
@@ -12,32 +12,18 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   children: ReactNode;
 }
 
-/**
- * Primary is ink, not a brand colour — see the palette note in index.css.
- * The active state uses a 1px translate rather than a scale, which reads as a
- * physical press instead of a zoom.
- */
+/** DESIGN_SYSTEM.md §6 — four variants, three sizes, all seven states. */
 const variants: Record<Variant, string> = {
-  primary: cn(
-    'bg-ink text-white shadow-xs',
-    'hover:bg-ink/90 active:translate-y-px',
-    'disabled:bg-ink-4 disabled:shadow-none',
-  ),
-  secondary: cn(
-    'bg-surface text-ink border border-line shadow-xs',
-    'hover:border-line-strong hover:bg-sunk active:translate-y-px',
-  ),
-  ghost: 'text-ink-2 hover:bg-sunk hover:text-ink active:translate-y-px',
-  danger: cn(
-    'bg-surface text-bad border border-bad-line',
-    'hover:bg-bad-soft active:translate-y-px',
-  ),
+  primary: 'bg-accent text-white shadow-xs hover:bg-accent-hover active:bg-accent-active disabled:bg-text-disabled disabled:shadow-none',
+  secondary: 'bg-surface text-text border border-border-strong shadow-xs hover:bg-surface-hover disabled:text-text-disabled disabled:bg-surface-sunken',
+  ghost: 'text-text-secondary hover:bg-surface-hover disabled:text-text-disabled',
+  danger: 'bg-danger text-white hover:bg-danger-hover disabled:bg-text-disabled',
 };
 
 const sizes: Record<Size, string> = {
-  xs: 'h-6 gap-1 rounded-sm px-2 text-xs',
-  sm: 'h-7.5 gap-1.5 rounded-md px-2.5 text-xs',
-  md: 'h-9 gap-1.5 rounded-md px-3.5 text-base',
+  sm: 'h-8 gap-1.5 rounded-md px-2.5 text-small',
+  md: 'h-10 gap-1.5 rounded-lg px-3.5 text-small',
+  lg: 'h-11 gap-2 rounded-lg px-4 text-body',
 };
 
 export function Button({
@@ -56,8 +42,9 @@ export function Button({
       aria-busy={loading || undefined}
       className={cn(
         'relative inline-flex shrink-0 items-center justify-center font-medium whitespace-nowrap',
-        'transition-[background-color,border-color,transform,opacity] duration-150',
-        'disabled:cursor-not-allowed disabled:opacity-70 disabled:active:translate-y-0',
+        'transition-colors duration-150',
+        'focus-visible:outline-none focus-visible:ring focus-visible:ring-border-focus focus-visible:ring-offset-2',
+        'disabled:cursor-not-allowed',
         variants[variant],
         sizes[size],
         className,
@@ -65,12 +52,12 @@ export function Button({
       {...rest}
     >
       {/* The label keeps its width while loading, so the button never resizes
-          mid-click and shift the row under the cursor. */}
+          mid-click and shifts the row under the cursor. */}
       <span className={cn('inline-flex items-center gap-1.5', loading && 'invisible')}>
         {children}
       </span>
       {loading ? (
-        <Loader2 className="absolute size-3.5 animate-spin" aria-hidden />
+        <Loader2 className="absolute size-4 animate-spin" aria-hidden />
       ) : null}
     </button>
   );
@@ -87,8 +74,9 @@ export function IconButton({ label, className, children, ...rest }: IconButtonPr
       type="button"
       aria-label={label}
       className={cn(
-        'inline-flex size-7 shrink-0 items-center justify-center rounded-md',
-        'text-ink-3 transition-colors duration-150 hover:bg-sunk hover:text-ink',
+        'inline-flex size-8 shrink-0 items-center justify-center rounded-md',
+        'text-text-secondary transition-colors duration-150 hover:bg-surface-hover hover:text-text',
+        'focus-visible:outline-none focus-visible:ring focus-visible:ring-border-focus focus-visible:ring-offset-2',
         className,
       )}
       {...rest}
