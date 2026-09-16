@@ -6,23 +6,12 @@ Talks only to `apps/api` (`/api`, port 4000). Never to `apps/agent` or `apps/edg
 
     make dashboard      # or: pnpm --filter dashboard dev
 
-## Fixtures
+## Configuration
 
-`VITE_USE_FIXTURES` defaults to on. Every screen is served from
-`src/fixtures/`, an in-memory stand-in for `apps/api` — so the dashboard can be
-built and demoed before the backend routes exist, and a dead API on stage is
-not a dead demo. Set `VITE_USE_FIXTURES=false` to talk to the real API.
-
-The fixture store mutates: status changes and stock edits persist for the
-session, a new order arrives every 45s so the 3s poll visibly does something,
-and stock decrements after each order the way `packages/domain` will.
-
-Two switches worth knowing:
-
-| | |
-|---|---|
-| `?inventoryMode=external` | Flips the shop to the synced-POS variant — read-only inventory, sync banner, no stock column |
-| Sign out (Settings) | Exercises the login screen and route guard. Persisted in `sessionStorage`, so a reload does not silently sign you back in |
+`VITE_API_BASE_URL` must point at a running `apps/api`. There is no fallback
+and no fixture/demo-data mode — if it's unset, the app renders an explicit
+configuration-error screen (`src/app/ConfigErrorScreen.tsx`) instead of the
+router. See `.env.example`.
 
 ## Contract
 
@@ -39,8 +28,7 @@ Nothing here invents backend behaviour silently — if a field is marked
 ```
 src/
 ├── api/          typed client, one module per resource, query keys
-├── fixtures/     the in-memory API (delete when apps/api lands)
-├── app/          router, providers, shell, auth guard
+├── app/          router, providers, shell, auth guard, config-error screen
 ├── components/ui hand-rolled primitives
 ├── features/     auth · orders · inventory · settings · stats
 └── lib/          money + time formatting

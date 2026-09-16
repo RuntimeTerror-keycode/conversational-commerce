@@ -22,19 +22,16 @@ export function OrderRow({ order, onOpen, onAdvance, pending, index = 0 }: Order
   return (
     <div
       className={cn(
-        'group animate-rise relative flex items-stretch gap-3.5 pr-3 pl-0',
+        'animate-slide-up group relative flex items-stretch gap-3.5 pr-3',
         'transition-colors duration-150',
-        isNew ? 'bg-new-soft/30 hover:bg-new-soft/50' : 'hover:bg-paper',
+        isNew ? 'bg-warning-bg/30 hover:bg-warning-bg/50' : 'hover:bg-surface-hover',
       )}
       // Capped so a full page of orders never takes more than a beat to settle.
       style={{ animationDelay: `${Math.min(index, 8) * 28}ms` }}
     >
       {/* Status rail. Colour-coded, but the badge carries the same meaning in
           words — colour is never the only signal. */}
-      <span
-        className={cn('w-[3px] shrink-0', statusRail[order.status])}
-        aria-hidden
-      />
+      <span className={cn('w-1 shrink-0', statusRail[order.status])} aria-hidden />
 
       <button
         type="button"
@@ -43,19 +40,19 @@ export function OrderRow({ order, onOpen, onAdvance, pending, index = 0 }: Order
       >
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-            <span className="tnum text-base font-semibold">{order.orderCode}</span>
+            <span className="font-numeric text-body font-semibold">{order.orderCode}</span>
             <StatusBadge status={order.status} />
-            <span className="text-xs whitespace-nowrap text-ink-4">
+            <span className="text-caption whitespace-nowrap text-text-disabled">
               {timeAgo(order.placedAt)}
             </span>
           </div>
 
-          <div className="mt-1 flex items-center gap-1.5 text-sm text-ink-2">
+          <div className="mt-1 flex items-center gap-1.5 text-small text-text-secondary">
             <span className="truncate font-medium">
               {order.customer.displayName ?? order.customer.ref}
             </span>
-            <span className="text-ink-4" aria-hidden>·</span>
-            <span className="tnum whitespace-nowrap text-ink-3">
+            <span className="text-text-disabled" aria-hidden>·</span>
+            <span className="font-numeric whitespace-nowrap text-text-muted">
               {plural(order.itemCount, 'item')}
             </span>
           </div>
@@ -67,26 +64,19 @@ export function OrderRow({ order, onOpen, onAdvance, pending, index = 0 }: Order
             rather than a grey aside.
           */}
           {order.firstLineSourceText ? (
-            <p className="mt-1.5 truncate text-xs text-ink-3 italic">
+            <p className="mt-1.5 truncate text-caption text-text-muted italic">
               “{order.firstLineSourceText}”
             </p>
           ) : null}
         </div>
 
-        <span className="tnum shrink-0 text-lg font-semibold">
-          {formatMoney(order.total)}
-        </span>
+        <span className="font-numeric shrink-0 text-h3">{formatMoney(order.total)}</span>
       </button>
 
       {/* Fixed width so the price column stays aligned down the list — the
           action labels differ in length ("Mark packed" vs "Out for delivery")
           and a ragged money column is the first thing that reads as unfinished. */}
-      <div
-        className={cn(
-          'flex shrink-0 items-center justify-end',
-          onAdvance ? 'w-[124px]' : 'w-6',
-        )}
-      >
+      <div className={cn('flex shrink-0 items-center justify-end', onAdvance ? 'w-32' : 'w-6')}>
         {action && onAdvance ? (
           <Button
             size="sm"
@@ -98,7 +88,7 @@ export function OrderRow({ order, onOpen, onAdvance, pending, index = 0 }: Order
           </Button>
         ) : (
           <ChevronRight
-            className="size-4 text-ink-4 opacity-0 transition-opacity duration-150 group-hover:opacity-100"
+            className="size-4 text-text-disabled opacity-0 transition-opacity duration-150 group-hover:opacity-100"
             aria-hidden
           />
         )}

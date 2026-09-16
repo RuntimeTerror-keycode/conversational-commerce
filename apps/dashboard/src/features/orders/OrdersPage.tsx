@@ -78,7 +78,7 @@ export function OrdersPage() {
   const inProgress = counts ? counts.packed + counts.out_for_delivery : undefined;
 
   const filters: SegmentItem<Filter>[] = [
-    { value: 'new', label: 'New', count: counts?.accepted, tone: 'new' },
+    { value: 'new', label: 'New', count: counts?.accepted, tone: 'attention' },
     { value: 'in_progress', label: 'In progress', count: inProgress },
     { value: 'all', label: 'All active' },
   ];
@@ -91,7 +91,7 @@ export function OrdersPage() {
         title="Orders"
         subtitle={
           counts ? (
-            <span className="tnum">
+            <span className="font-numeric">
               {counts.accepted} waiting · {inProgress} in progress
             </span>
           ) : null
@@ -99,7 +99,7 @@ export function OrdersPage() {
         actions={<LiveDot state={error ? 'stale' : 'live'} />}
       />
 
-      <div className="flex flex-col gap-4 px-5 py-5 md:px-7">
+      <div className="mx-auto flex max-w-content flex-col gap-4 px-4 py-6 md:px-8">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <Segmented items={filters} value={filter} onChange={setFilter} />
 
@@ -147,7 +147,7 @@ export function OrdersPage() {
             ) : (
               <div
                 className={cn(
-                  'divide-y divide-line-soft transition-opacity duration-200',
+                  'divide-y divide-border transition-opacity duration-200',
                   isPlaceholderData ? 'opacity-50' : 'opacity-100',
                 )}
               >
@@ -171,4 +171,3 @@ export function OrdersPage() {
     </>
   );
 }
-

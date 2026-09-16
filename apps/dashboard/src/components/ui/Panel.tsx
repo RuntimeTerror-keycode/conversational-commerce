@@ -2,7 +2,7 @@ import type { HTMLAttributes, ReactNode } from 'react';
 import { cn } from '@/lib/cn';
 
 interface PanelProps extends HTMLAttributes<HTMLDivElement> {
-  children: ReactNode;
+  children?: ReactNode;
 }
 
 /**
@@ -16,7 +16,7 @@ export function Panel({ className, children, ...rest }: PanelProps) {
   return (
     <div
       className={cn(
-        'overflow-hidden rounded-xl border border-line bg-surface shadow-xs',
+        'overflow-hidden rounded-xl border border-border bg-surface shadow-xs',
         className,
       )}
       {...rest}
@@ -36,11 +36,11 @@ export function PanelHeader({ title, action, className }: PanelHeaderProps) {
   return (
     <div
       className={cn(
-        'flex items-center justify-between gap-3 border-b border-line-soft px-4 py-3',
+        'flex items-center justify-between gap-3 border-b border-border px-4 py-3',
         className,
       )}
     >
-      <h2 className="text-lg font-semibold tracking-tight">{title}</h2>
+      <h2 className="text-h3">{title}</h2>
       {action}
     </div>
   );

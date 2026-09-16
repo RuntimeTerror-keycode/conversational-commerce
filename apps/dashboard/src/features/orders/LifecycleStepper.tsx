@@ -16,12 +16,12 @@ import { LIFECYCLE_STEPS, stepIndex } from './lifecycle';
 export function LifecycleStepper({ order }: { order: Order }) {
   if (order.status === 'rejected') {
     return (
-      <div className="flex items-center gap-2.5 rounded-lg border border-bad-line bg-bad-soft px-3.5 py-3">
-        <span className="size-2 shrink-0 rounded-full bg-bad" aria-hidden />
+      <div className="flex items-center gap-2.5 rounded-lg border border-danger-border bg-danger-bg px-3.5 py-3">
+        <span className="size-2 shrink-0 rounded-full bg-danger" aria-hidden />
         <div>
-          <p className="text-base font-semibold text-bad">Rejected</p>
+          <p className="text-body font-semibold text-danger-fg">Rejected</p>
           {order.rejectionReason ? (
-            <p className="text-xs text-bad/80">{order.rejectionReason}</p>
+            <p className="text-caption text-danger-fg/80">{order.rejectionReason}</p>
           ) : null}
         </div>
       </div>
@@ -43,12 +43,9 @@ export function LifecycleStepper({ order }: { order: Order }) {
     <div className="relative">
       {/* Track sits behind the nodes, inset by half a node so it starts and
           ends at the centres rather than at the edges of the row. */}
-      <div
-        className="absolute top-3 right-[12.5%] left-[12.5%] h-0.5 rounded-full bg-line"
-        aria-hidden
-      >
+      <div className="absolute top-3 right-[12.5%] left-[12.5%] h-0.5 rounded-full bg-border" aria-hidden>
         <div
-          className="h-full rounded-full bg-ink transition-[width] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]"
+          className="h-full rounded-full bg-success transition-[width] duration-500 ease-out"
           style={{ width: `${fillPercent}%` }}
         />
       </div>
@@ -64,10 +61,11 @@ export function LifecycleStepper({ order }: { order: Order }) {
               <span
                 className={cn(
                   'flex size-6 items-center justify-center rounded-full border-2 transition-all duration-300',
-                  done
-                    ? 'border-ink bg-ink text-white'
-                    : 'border-line bg-surface text-ink-4',
-                  isCurrent && order.status !== 'delivered' && 'ring-3 ring-ink/10',
+                  isCurrent && order.status !== 'delivered'
+                    ? 'border-accent bg-accent text-white ring-3 ring-accent-subtle'
+                    : done
+                      ? 'border-success bg-success text-white'
+                      : 'border-border-strong bg-surface text-text-muted',
                 )}
               >
                 {index === 0 ? (
@@ -82,13 +80,14 @@ export function LifecycleStepper({ order }: { order: Order }) {
               <div className="px-1 text-center">
                 <p
                   className={cn(
-                    'text-xs font-medium',
-                    done ? 'text-ink' : 'text-ink-4',
+                    'text-caption font-medium',
+                    done || isCurrent ? 'text-text' : 'text-text-muted',
+                    isCurrent && 'font-semibold',
                   )}
                 >
                   {index === 0 ? 'Auto-accepted' : step.label}
                 </p>
-                <p className="tnum text-2xs tracking-normal text-ink-4">
+                <p className="font-numeric text-caption tracking-normal text-text-muted">
                   {at ? formatTime(at) : '—'}
                 </p>
               </div>

@@ -1,3 +1,4 @@
+import * as Switch from '@radix-ui/react-switch';
 import { cn } from '@/lib/cn';
 
 interface ToggleProps {
@@ -6,7 +7,7 @@ interface ToggleProps {
   label: string;
   disabled?: boolean;
   /** Off means "out of stock", which is a problem, not a neutral state. */
-  offTone?: 'neutral' | 'bad';
+  offTone?: 'neutral' | 'danger';
 }
 
 export function Toggle({
@@ -17,30 +18,25 @@ export function Toggle({
   offTone = 'neutral',
 }: ToggleProps) {
   return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      aria-label={label}
+    <Switch.Root
+      checked={checked}
+      onCheckedChange={onChange}
       disabled={disabled}
-      onClick={() => onChange(!checked)}
+      aria-label={label}
       className={cn(
         'relative h-5 w-9 shrink-0 rounded-full transition-colors duration-200',
+        'focus-visible:outline-none focus-visible:ring focus-visible:ring-border-focus focus-visible:ring-offset-2',
         'disabled:cursor-not-allowed disabled:opacity-50',
-        checked
-          ? 'bg-done'
-          : offTone === 'bad'
-            ? 'bg-bad-line'
-            : 'bg-line-strong',
+        checked ? 'bg-success' : offTone === 'danger' ? 'bg-danger-border' : 'bg-border-strong',
       )}
     >
-      <span
+      <Switch.Thumb
         className={cn(
-          'absolute top-0.5 size-4 rounded-full bg-white shadow-xs',
-          'transition-transform duration-200 ease-[cubic-bezier(0.22,1,0.36,1)]',
-          checked ? 'translate-x-4.5' : 'translate-x-0.5',
+          'block size-4 translate-x-0.5 rounded-full bg-white shadow-xs',
+          'transition-transform duration-200 ease-out',
+          'data-[state=checked]:translate-x-4.5',
         )}
       />
-    </button>
+    </Switch.Root>
   );
 }

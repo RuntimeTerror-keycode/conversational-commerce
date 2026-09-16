@@ -1,5 +1,4 @@
-import type { InputHTMLAttributes, ReactNode } from 'react';
-import { useId } from 'react';
+import { forwardRef, useId, type InputHTMLAttributes, type ReactNode } from 'react';
 import { cn } from '@/lib/cn';
 
 interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
@@ -10,16 +9,15 @@ interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   trailing?: ReactNode;
 }
 
-export function Input({
-  label,
-  hint,
-  error,
-  leading,
-  trailing,
-  className,
-  id,
-  ...rest
-}: InputProps) {
+/**
+ * Forwards its ref to the native input — required for react-hook-form's
+ * `register()`, which attaches via ref rather than a controlled `value` prop.
+ * Without this, RHF's defaultValues never reach the DOM node.
+ */
+export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
+  { label, hint, error, leading, trailing, className, id, ...rest },
+  ref,
+) {
   const generatedId = useId();
   const inputId = id ?? generatedId;
   const describedBy = error ? `${inputId}-error` : hint ? `${inputId}-hint` : undefined;
@@ -34,44 +32,44 @@ export function Input({
 
       <div className="relative">
         {leading ? (
-          <span className="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-ink-4">
+          <span className="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-text-disabled">
             {leading}
           </span>
         ) : null}
 
         <input
+          ref={ref}
           id={inputId}
           aria-invalid={error ? true : undefined}
           aria-describedby={describedBy}
           className={cn(
-            'h-9 w-full rounded-md border bg-surface px-2.5 text-base text-ink shadow-xs',
-            'transition-[border-color,box-shadow] duration-150',
-            'placeholder:text-ink-4',
-            'disabled:cursor-not-allowed disabled:bg-sunk disabled:text-ink-3',
-            error
-              ? 'border-bad-line'
-              : 'border-line hover:border-line-strong',
-            leading && 'pl-8',
-            trailing && 'pr-8',
+            'h-10 w-full rounded-md border bg-surface px-2.5 text-body text-text shadow-xs',
+            'transition-colors duration-150',
+            'placeholder:text-text-disabled',
+            'focus-visible:outline-none focus-visible:ring focus-visible:ring-border-focus focus-visible:ring-offset-2',
+            'disabled:cursor-not-allowed disabled:bg-surface-sunken disabled:text-text-disabled',
+            error ? 'border-danger-border' : 'border-border-strong hover:border-text-disabled',
+            leading && 'pl-9',
+            trailing && 'pr-9',
             className,
           )}
           {...rest}
         />
 
         {trailing ? (
-          <span className="absolute top-1/2 right-2 -translate-y-1/2">{trailing}</span>
+          <span className="absolute top-1/2 right-2.5 -translate-y-1/2">{trailing}</span>
         ) : null}
       </div>
 
       {error ? (
-        <p id={`${inputId}-error`} className="text-xs text-bad">
+        <p id={`${inputId}-error`} className="text-caption text-danger-fg">
           {error}
         </p>
       ) : hint ? (
-        <p id={`${inputId}-hint`} className="text-xs text-ink-3">
+        <p id={`${inputId}-hint`} className="text-caption text-text-muted">
           {hint}
         </p>
       ) : null}
     </div>
   );
-}
+});

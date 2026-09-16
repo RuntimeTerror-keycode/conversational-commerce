@@ -116,8 +116,20 @@ export type InventoryMode = 'managed' | 'external';
 export interface User {
   id: string;
   name: string;
+  /** PROPOSED — not in any doc. Brief §4 item 7 asks for editable personal info. */
+  email: string | null;
+  phone: string | null;
   role: 'owner' | 'staff';
   retailerId: string;
+}
+
+/** PROPOSED. PATCH /api/auth/me -> Session (only user fields are writable here). */
+export type ProfilePatch = Partial<Pick<User, 'name' | 'email' | 'phone'>>;
+
+/** PROPOSED. POST /api/auth/change-password -> 204. */
+export interface ChangePasswordRequest {
+  currentPassword: string;
+  newPassword: string;
 }
 
 export interface Retailer {
@@ -413,6 +425,8 @@ export interface StatsSummary {
  *  POST   /api/auth/login              LoginRequest      -> Session
  *  POST   /api/auth/logout             -                 -> 204
  *  GET    /api/auth/me                 -                 -> Session
+ *  PATCH  /api/auth/me                 ProfilePatch      -> Session      (PROPOSED)
+ *  POST   /api/auth/change-password    ChangePasswordRequest -> 204      (PROPOSED)
  *
  *  GET    /api/orders                  OrderListQuery    -> OrderListResponse
  *  GET    /api/orders/:id              -                 -> Order

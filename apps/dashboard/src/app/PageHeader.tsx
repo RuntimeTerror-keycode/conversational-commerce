@@ -19,15 +19,15 @@ export function PageHeader({ title, subtitle, actions, className }: PageHeaderPr
   return (
     <header
       className={cn(
-        'sticky top-0 z-20 border-b border-line bg-paper/85 backdrop-blur-md',
+        'sticky top-0 z-20 border-b border-border bg-canvas/85 backdrop-blur-md',
         className,
       )}
     >
-      <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-3.5 md:px-7">
+      <div className="mx-auto flex max-w-content flex-wrap items-center justify-between gap-3 px-4 py-3.5 md:px-8">
         <div className="min-w-0">
-          <h1 className="text-xl font-semibold">{title}</h1>
+          <h1 className="text-h2">{title}</h1>
           {subtitle ? (
-            <div className="mt-0.5 text-sm text-ink-3">{subtitle}</div>
+            <div className="mt-0.5 text-small text-text-muted">{subtitle}</div>
           ) : null}
         </div>
 

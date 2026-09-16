@@ -68,14 +68,14 @@ export function HistoryPage() {
         title="Order history"
         subtitle={
           orders.length > 0 ? (
-            <span className="tnum">
+            <span className="font-numeric">
               {plural(orders.length, 'order')} · {formatMoney(takings)} delivered
             </span>
           ) : null
         }
       />
 
-      <div className="flex flex-col gap-4 px-5 py-5 md:px-7">
+      <div className="mx-auto flex max-w-content flex-col gap-4 px-4 py-6 md:px-8">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <Segmented items={filters} value={filter} onChange={setFilter} />
 
@@ -111,7 +111,7 @@ export function HistoryPage() {
           ) : (
             <div
               className={cn(
-                'divide-y divide-line-soft transition-opacity duration-200',
+                'divide-y divide-border transition-opacity duration-200',
                 isPlaceholderData ? 'opacity-50' : 'opacity-100',
               )}
             >

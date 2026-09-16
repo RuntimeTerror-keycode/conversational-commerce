@@ -11,8 +11,8 @@ export function RequireAuth() {
     // resolves in a few hundred milliseconds and a full ghost app flashing
     // past is more distracting than a quiet hold.
     return (
-      <div className="flex min-h-screen items-center justify-center bg-paper">
-        <div className="animate-shimmer flex size-10 items-center justify-center rounded-xl bg-ink text-white">
+      <div className="flex min-h-screen items-center justify-center bg-canvas">
+        <div className="animate-shimmer flex size-10 items-center justify-center rounded-xl bg-accent text-white">
           <Store className="size-5" aria-hidden />
         </div>
       </div>

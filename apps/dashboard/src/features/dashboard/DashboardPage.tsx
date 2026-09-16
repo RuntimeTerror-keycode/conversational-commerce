@@ -65,8 +65,8 @@ export function DashboardPage() {
         actions={<LiveDot state={newOrders.error ? 'stale' : 'live'} />}
       />
 
-      <div className="flex flex-col gap-5 px-5 py-5 md:px-7">
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="mx-auto flex max-w-content flex-col gap-6 px-4 py-6 md:px-8">
+        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
           <StatTile
             label="Waiting to pack"
             value={stats.data?.newOrders ?? 0}
@@ -103,7 +103,7 @@ export function DashboardPage() {
               action={
                 <Link
                   to="/orders"
-                  className="inline-flex items-center gap-1 text-sm font-medium text-ink-2 transition-colors hover:text-ink"
+                  className="inline-flex items-center gap-1 text-small font-medium text-text-secondary transition-colors hover:text-text"
                 >
                   All orders
                   <ArrowRight className="size-3.5" aria-hidden />
@@ -114,7 +114,7 @@ export function DashboardPage() {
             {newOrders.isPending ? (
               <SkeletonRows rows={3} />
             ) : newOrders.data && newOrders.data.data.length > 0 ? (
-              <div className="divide-y divide-line-soft">
+              <div className="divide-y divide-border">
                 {newOrders.data.data.map((order, index) => (
                   <OrderRow
                     key={order.id}
@@ -140,7 +140,7 @@ export function DashboardPage() {
               action={
                 <Link
                   to="/inventory"
-                  className="inline-flex items-center gap-1 text-sm font-medium text-ink-2 transition-colors hover:text-ink"
+                  className="inline-flex items-center gap-1 text-small font-medium text-text-secondary transition-colors hover:text-text"
                 >
                   Inventory
                   <ArrowRight className="size-3.5" aria-hidden />
@@ -149,29 +149,25 @@ export function DashboardPage() {
             />
 
             {stockIssues.length > 0 ? (
-              <div className="divide-y divide-line-soft">
+              <div className="divide-y divide-border">
                 {stockIssues.map((product) => (
                   <button
                     key={product.id}
                     type="button"
                     onClick={() => navigate('/inventory')}
-                    className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-paper"
+                    className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-surface-hover"
                   >
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate text-base font-medium">
+                      <span className="block truncate text-body font-medium">
                         {product.name}
                       </span>
-                      <span className="block text-xs text-ink-3">{product.category}</span>
+                      <span className="block text-caption text-text-muted">{product.category}</span>
                     </span>
 
                     {product.inStock ? (
-                      <Badge tone="new" dot>
-                        {product.stockQuantity} left
-                      </Badge>
+                      <Badge tone="warning">{product.stockQuantity} left</Badge>
                     ) : (
-                      <Badge tone="bad" dot>
-                        Out
-                      </Badge>
+                      <Badge tone="danger">Out</Badge>
                     )}
                   </button>
                 ))}
@@ -188,10 +184,10 @@ export function DashboardPage() {
         </div>
 
         {gone.length > 0 ? (
-          <div className="flex items-start gap-2.5 rounded-lg border border-bad-line bg-bad-soft px-3.5 py-3">
-            <TriangleAlert className="mt-0.5 size-4 shrink-0 text-bad" aria-hidden />
-            <p className="text-sm text-ink-2">
-              <span className="font-semibold text-bad">
+          <div className="flex items-start gap-2.5 rounded-lg border border-danger-border bg-danger-bg px-3.5 py-3">
+            <TriangleAlert className="mt-0.5 size-4 shrink-0 text-danger-fg" aria-hidden />
+            <p className="text-small text-text-secondary">
+              <span className="font-semibold text-danger-fg">
                 {gone.length} {gone.length === 1 ? 'item is' : 'items are'} out of stock.
               </span>{' '}
               The assistant will stop offering {gone.length === 1 ? 'it' : 'them'} on

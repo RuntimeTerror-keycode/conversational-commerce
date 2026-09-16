@@ -40,7 +40,7 @@ export function StockCell({ value, isLow, editable, onCommit }: StockCellProps) 
   }, [value]);
 
   if (!editable) {
-    return <span className="tnum text-sm text-ink-3">{value}</span>;
+    return <span className="font-numeric text-small text-text-muted">{value}</span>;
   }
 
   const commit = () => {
@@ -73,11 +73,12 @@ export function StockCell({ value, isLow, editable, onCommit }: StockCellProps) 
         }
       }}
       className={cn(
-        'tnum h-7 w-16 rounded-md border border-transparent bg-transparent px-2 text-right text-sm',
+        'font-numeric h-8 w-16 rounded-md border border-transparent bg-transparent px-2 text-right text-small',
         'transition-colors duration-200',
-        'hover:border-line hover:bg-surface focus:border-ink focus:bg-surface focus:outline-none',
-        flash && 'border-new-line bg-new-soft',
-        isLow ? 'font-semibold text-new-ink' : 'text-ink',
+        'hover:border-border-strong hover:bg-surface',
+        'focus-visible:border-accent focus-visible:bg-surface focus-visible:outline-none focus-visible:ring focus-visible:ring-border-focus focus-visible:ring-offset-2',
+        flash && 'border-warning-border bg-warning-bg',
+        isLow ? 'font-semibold text-warning-fg' : 'text-text',
       )}
     />
   );

@@ -22,9 +22,9 @@ export function StatTile({
 }: StatTileProps) {
   if (loading) {
     return (
-      <div className="rounded-xl border border-line bg-surface px-4 py-3.5 shadow-xs">
+      <div className="rounded-xl border border-border bg-surface px-4 py-3.5 shadow-xs">
         <Skeleton className="h-3 w-20" />
-        <Skeleton className="mt-2.5 h-7 w-14" />
+        <Skeleton className="mt-2.5 h-9 w-16" />
       </div>
     );
   }
@@ -38,20 +38,15 @@ export function StatTile({
       className={cn(
         'rounded-xl border bg-surface px-4 py-3.5 text-left shadow-xs',
         'transition-all duration-150',
-        alert ? 'border-new-line bg-new-soft/40' : 'border-line',
-        onClick && 'hover:-translate-y-px hover:shadow-sm',
+        alert ? 'border-warning-border bg-warning-bg/40' : 'border-border',
+        onClick && 'hover:-translate-y-px hover:shadow-sm focus-visible:outline-none focus-visible:ring focus-visible:ring-border-focus focus-visible:ring-offset-2',
       )}
     >
-      <p className="label">{label}</p>
-      <p
-        className={cn(
-          'tnum mt-1 text-2xl font-semibold',
-          alert ? 'text-new-ink' : 'text-ink',
-        )}
-      >
+      <p className="text-caption text-text-muted uppercase tracking-wide">{label}</p>
+      <p className={cn('font-numeric text-metric', alert ? 'text-warning-fg' : 'text-text')}>
         {value}
       </p>
-      {hint ? <p className="mt-0.5 text-xs text-ink-3">{hint}</p> : null}
+      {hint ? <p className="mt-0.5 text-caption text-text-muted">{hint}</p> : null}
     </Element>
   );
 }

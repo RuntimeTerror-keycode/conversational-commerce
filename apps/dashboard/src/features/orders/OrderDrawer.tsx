@@ -16,7 +16,9 @@ import { useAdvanceOrder, useOrder } from './useOrders';
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section className="flex flex-col gap-2.5">
-      <h3 className="label">{title}</h3>
+      <h3 className="text-caption font-semibold text-text-muted uppercase tracking-wide">
+        {title}
+      </h3>
       {children}
     </section>
   );
@@ -45,7 +47,7 @@ export function OrderDrawer({ orderId, onClose }: OrderDrawerProps) {
       title={
         order ? (
           <div className="flex items-center gap-2.5">
-            <span className="tnum text-lg font-semibold">{order.orderCode}</span>
+            <span className="font-numeric text-h3">{order.orderCode}</span>
             <StatusBadge status={order.status} />
           </div>
         ) : (
@@ -56,6 +58,7 @@ export function OrderDrawer({ orderId, onClose }: OrderDrawerProps) {
         action ? (
           <Button
             variant="primary"
+            size="lg"
             className="w-full"
             loading={advance.isPending}
             onClick={() => onAdvance(action.status)}
@@ -63,7 +66,7 @@ export function OrderDrawer({ orderId, onClose }: OrderDrawerProps) {
             {action.label}
           </Button>
         ) : order ? (
-          <p className="text-center text-sm text-ink-3">
+          <p className="text-center text-small text-text-muted">
             {order.status === 'delivered' ? 'Order complete' : 'No further action'}
           </p>
         ) : undefined
@@ -82,78 +85,76 @@ export function OrderDrawer({ orderId, onClose }: OrderDrawerProps) {
           <LifecycleStepper order={order} />
 
           <Section title="Items">
-            <div className="overflow-hidden rounded-lg border border-line">
+            <div className="overflow-hidden rounded-lg border border-border">
               {order.items.map((line) => (
                 <div
                   key={line.lineId}
-                  className="flex items-start gap-3 border-b border-line-soft px-3.5 py-3 last:border-b-0"
+                  className="flex items-start gap-3 border-b border-border px-3.5 py-3 last:border-b-0"
                 >
                   <div className="min-w-0 flex-1">
-                    <p className="text-base font-medium">{line.productName}</p>
+                    <p className="text-body font-medium">{line.productName}</p>
 
                     {/* The customer's own phrasing, on every line. §C3 rule 3. */}
                     {line.sourceText ? (
-                      <p className="mt-0.5 text-xs text-ink-3 italic">
+                      <p className="mt-0.5 text-caption text-text-muted italic">
                         “{line.sourceText}”
                       </p>
                     ) : null}
 
                     {line.substitutedFor ? (
-                      <Badge tone="packed" className="mt-1.5">
+                      <Badge tone="info" className="mt-1.5">
                         Replaced {line.substitutedFor.productName}
                       </Badge>
                     ) : null}
 
                     {line.availability === 'out_of_stock' ? (
-                      <Badge tone="bad" dot className="mt-1.5">
+                      <Badge tone="danger" className="mt-1.5">
                         Out of stock
                       </Badge>
                     ) : null}
                   </div>
 
                   <div className="shrink-0 text-right">
-                    <p className="tnum text-base font-medium">
+                    <p className="font-numeric text-body font-medium">
                       {formatMoney(line.lineTotal)}
                     </p>
-                    <p className="tnum text-xs text-ink-4">
+                    <p className="font-numeric text-caption text-text-disabled">
                       {line.quantity} × {formatMoney(line.unitPrice)}
                     </p>
                   </div>
                 </div>
               ))}
 
-              <div className="flex items-center justify-between bg-paper px-3.5 py-3">
-                <span className="text-base font-semibold">Total</span>
-                <span className="tnum text-lg font-semibold">
-                  {formatMoney(order.total)}
-                </span>
+              <div className="flex items-center justify-between bg-canvas px-3.5 py-3">
+                <span className="text-body font-semibold">Total</span>
+                <span className="font-numeric text-h3">{formatMoney(order.total)}</span>
               </div>
             </div>
           </Section>
 
           <Section title="Customer">
-            <div className="flex flex-col gap-2.5 rounded-lg border border-line px-3.5 py-3">
-              <p className="text-base font-medium">
+            <div className="flex flex-col gap-2.5 rounded-lg border border-border px-3.5 py-3">
+              <p className="text-body font-medium">
                 {order.customer.displayName ?? order.customer.ref}
               </p>
 
               {order.customer.phone ? (
                 <a
                   href={`tel:${order.customer.phone}`}
-                  className="flex items-center gap-2 text-sm text-ink-2 hover:text-ink"
+                  className="flex items-center gap-2 text-small text-text-secondary hover:text-text"
                 >
-                  <Phone className="size-3.5 shrink-0 text-ink-4" aria-hidden />
-                  <span className="tnum">{order.customer.phone}</span>
+                  <Phone className="size-3.5 shrink-0 text-text-disabled" aria-hidden />
+                  <span className="font-numeric">{order.customer.phone}</span>
                 </a>
               ) : null}
 
               {order.delivery.address ? (
-                <p className="flex items-start gap-2 text-sm text-ink-2">
-                  <MapPin className="mt-0.5 size-3.5 shrink-0 text-ink-4" aria-hidden />
+                <p className="flex items-start gap-2 text-small text-text-secondary">
+                  <MapPin className="mt-0.5 size-3.5 shrink-0 text-text-disabled" aria-hidden />
                   <span>
                     {order.delivery.address}
                     {order.delivery.note ? (
-                      <span className="mt-0.5 block text-xs text-ink-3 italic">
+                      <span className="mt-0.5 block text-caption text-text-muted italic">
                         “{order.delivery.note}”
                       </span>
                     ) : null}
@@ -161,10 +162,10 @@ export function OrderDrawer({ orderId, onClose }: OrderDrawerProps) {
                 </p>
               ) : null}
 
-              <p className="flex items-center gap-2 text-sm text-ink-2">
-                <Wallet className="size-3.5 shrink-0 text-ink-4" aria-hidden />
+              <p className="flex items-center gap-2 text-small text-text-secondary">
+                <Wallet className="size-3.5 shrink-0 text-text-disabled" aria-hidden />
                 <span className="uppercase">{order.payment.method}</span>
-                <Badge tone={order.payment.status === 'paid' ? 'done' : 'neutral'}>
+                <Badge tone={order.payment.status === 'paid' ? 'success' : 'neutral'}>
                   {order.payment.status}
                 </Badge>
               </p>
@@ -175,7 +176,7 @@ export function OrderDrawer({ orderId, onClose }: OrderDrawerProps) {
             <ActivityFeed events={order.events} />
           </Section>
 
-          <p className="tnum border-t border-line-soft pt-4 text-xs text-ink-4">
+          <p className="font-numeric border-t border-border pt-4 text-caption text-text-disabled">
             Placed {formatDateTime(order.placedAt)}
             {order.traceId ? ` · ${order.traceId}` : ''}
           </p>

@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { fetchProducts, updateProduct } from '@/api/inventory';
+import { createProduct, deleteProduct, fetchProducts, updateProduct } from '@/api/inventory';
 import { queryKeys } from '@/api/keys';
-import type { ProductListQuery, ProductPatch } from '@/api/types';
+import type { ProductCreate, ProductListQuery, ProductPatch } from '@/api/types';
 
 export function useInventory(query: ProductListQuery) {
   return useQuery({
@@ -17,6 +17,30 @@ export function useUpdateProduct() {
   return useMutation({
     mutationFn: ({ productId, patch }: { productId: string; patch: ProductPatch }) =>
       updateProduct(productId, patch),
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: ['inventory'] });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.stats });
+    },
+  });
+}
+
+export function useCreateProduct() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (product: ProductCreate) => createProduct(product),
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: ['inventory'] });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.stats });
+    },
+  });
+}
+
+export function useDeleteProduct() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (productId: string) => deleteProduct(productId),
     onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: ['inventory'] });
       void queryClient.invalidateQueries({ queryKey: queryKeys.stats });
