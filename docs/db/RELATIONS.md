@@ -7,7 +7,7 @@ for how tables connect.
 ## Entity relationship
 
 ```
-customer
+customer (phone is UNIQUE — same as WhatsApp number)
 ├── customer_address  (customer_id → customer.id)
 │   └── address       (address_id → address.id)
 ├── cart              (customer_id → customer.id)
@@ -26,6 +26,7 @@ customer
 shop
 ├── shop_address      (shop_id → shop.id)
 │   └── address       (address_id → address.id)
+├── shop_user         (shop_id → shop.id)  ← dashboard users, username is UNIQUE
 ├── shop_product      (shop_id → shop.id)
 │   ├── catalog       (catalog_id → catalog.id)
 │   └── offer         (shop_product_id → shop_product.id)
@@ -48,6 +49,7 @@ category
 | **customer_address** | `address_id` | `address.id` | many → one |
 | **shop_address** | `shop_id` | `shop.id` | many → one |
 | **shop_address** | `address_id` | `address.id` | many → one |
+| **shop_user** | `shop_id` | `shop.id` | many → one |
 | **category** | `parent_id` | `category.id` | many → one (self) |
 | **catalog** | `category_id` | `category.id` | many → one |
 | **tag** | `catalog_id` | `catalog.id` | many → one |
@@ -68,6 +70,13 @@ category
 | **message** | `customer_id` | `customer.id` | many → one |
 
 ## Key join paths
+
+**Retailer dashboard — identify the user and their shop:**
+```
+shop_user → shop (shop_id)
+```
+FE calls `POST /api/session` with `{ "username": "suresh" }`.
+API returns the `shop_user` + `shop`. FE stores `shop.id` and sends `X-Shop-Id` header on every call.
 
 **Retailer dashboard — list my fulfillments with customer info:**
 ```

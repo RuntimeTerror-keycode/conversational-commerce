@@ -249,7 +249,7 @@ INSERT INTO shop_address (shop_id, address_id) VALUES (1, 1), (2, 2), (3, 3);
 -- CUSTOMERS (demo — upserted from WhatsApp in production)
 -- ============================================================
 
-INSERT INTO customer (id, wa_id, display_name, language) VALUES
+INSERT INTO customer (id, phone, display_name, language) VALUES
     (1, '919847012345', 'Rajesh',  'en'),
     (2, '919847067890', 'Priya',   'en'),
     (3, '919847011111', 'Arun',    'en');
@@ -414,3 +414,14 @@ INSERT INTO shop_product (shop_id, catalog_id, local_name, regular_price, sellin
     (3, 62, 'Puttu Powder',                  52.00,  52.00,  20,  5, true),
     (3, 63, 'Rice Powder',                   45.00,  45.00,  15,  5, true),
     (3, 64, 'Appam Mix',                     55.00,  55.00,  15,  5, true);
+
+-- ============================================================
+-- SHOP USERS (one owner per shop for the hackathon)
+-- ============================================================
+
+INSERT INTO shop_user (id, shop_id, username, name, phone, role) VALUES
+    (1, 1, 'suresh',  'Suresh Kumar',  '919847100001', 'owner'),
+    (2, 2, 'anil',    'Anil Menon',    '919847100002', 'owner'),
+    (3, 3, 'geetha',  'Geetha Nair',   '919847100003', 'owner');
+
+SELECT setval('shop_user_id_seq', 3);

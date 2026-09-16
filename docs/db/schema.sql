@@ -8,7 +8,7 @@
 
 CREATE TABLE customer (
     id              SERIAL PRIMARY KEY,
-    wa_id           VARCHAR(20) NOT NULL UNIQUE,
+    phone           VARCHAR(20) NOT NULL UNIQUE,      -- WhatsApp number, e.g. "919847012345"
     display_name    VARCHAR(255),
     language        VARCHAR(50),
     created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -57,6 +57,18 @@ CREATE TABLE shop_address (
     id              SERIAL PRIMARY KEY,
     shop_id         INTEGER NOT NULL,
     address_id      INTEGER NOT NULL
+);
+
+-- Shop users — people who operate the dashboard for a shop
+CREATE TABLE shop_user (
+    id              SERIAL PRIMARY KEY,
+    shop_id         INTEGER NOT NULL,
+    username        VARCHAR(50) NOT NULL UNIQUE,       -- FE login identifier
+    name            VARCHAR(255) NOT NULL,
+    phone           VARCHAR(20) NOT NULL UNIQUE,
+    role            VARCHAR(50) NOT NULL DEFAULT 'staff',  -- 'owner' | 'staff'
+    is_active       BOOLEAN NOT NULL DEFAULT true,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 -- ============================================================
