@@ -2,6 +2,8 @@ export interface AppConfig {
   nodeEnv: string;
   port: number;
   logLevel: string;
+  databaseUrl: string;
+  rabbitmqUrl: string;
 }
 
 export class Config {
@@ -13,6 +15,8 @@ export class Config {
       nodeEnv: this.getEnv('NODE_ENV', 'development'),
       port: parseInt(this.getEnv('PORT', '4000'), 10),
       logLevel: this.getEnv('LOG_LEVEL', 'info'),
+      databaseUrl: this.getEnv('DATABASE_URL', 'postgresql://kadakaran:kadakaran@localhost:5432/kadakaran'),
+      rabbitmqUrl: this.getEnv('RABBITMQ_URL', 'amqp://kadakaran:kadakaran@localhost:5672'),
     };
 
     this.validate();
