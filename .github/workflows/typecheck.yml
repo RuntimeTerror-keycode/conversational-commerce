@@ -2,23 +2,17 @@ name: Typecheck
 
 on:
   pull_request:
-    branches: [main]
+    branches: [main, dev]
 
 jobs:
   typecheck-api:
     name: tsc --noEmit (apps/api)
     runs-on: ubuntu-latest
+    container: node:22-bookworm-slim
     defaults:
       run:
         working-directory: apps/api
     steps:
       - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-          cache-dependency-path: apps/api/package-lock.json
-
       - run: npm ci
       - run: npx tsc --noEmit
