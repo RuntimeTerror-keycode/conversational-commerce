@@ -5,7 +5,18 @@ install:
 	cd apps/edge && uv sync
 
 db:
-	docker compose up -d db
+	docker compose up -d db rabbitmq
+
+db-reset:
+	docker compose down -v
+	docker compose up -d db rabbitmq
+	@echo "Waiting for Postgres to init..."
+	@sleep 3
+	@echo "DB reset with fresh schema + seed data"
+
+seed:
+	PGPASSWORD=kadakaran psql -h localhost -U kadakaran -d kadakaran -f docs/db/schema.sql
+	PGPASSWORD=kadakaran psql -h localhost -U kadakaran -d kadakaran -f docs/db/seed.sql
 
 agent:
 	pnpm --filter agent dev

@@ -2,10 +2,26 @@ services:
   db:
     image: pgvector/pgvector:pg16
     environment:
-      POSTGRES_USER: cc
-      POSTGRES_PASSWORD: cc
-      POSTGRES_DB: cc
+      POSTGRES_USER: kadakaran
+      POSTGRES_PASSWORD: kadakaran
+      POSTGRES_DB: kadakaran
     ports: ["5432:5432"]
-    volumes: ["pgdata:/var/lib/postgresql/data"]
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./docs/db/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ./docs/db/seed.sql:/docker-entrypoint-initdb.d/02-seed.sql:ro
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    environment:
+      RABBITMQ_DEFAULT_USER: kadakaran
+      RABBITMQ_DEFAULT_PASS: kadakaran
+    ports:
+      - "5672:5672"       # AMQP
+      - "15672:15672"     # Management UI
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+
 volumes:
   pgdata:
+  rabbitmq_data:
