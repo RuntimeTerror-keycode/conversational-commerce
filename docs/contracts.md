@@ -104,7 +104,7 @@ resolveRetailer(customerRef: string): Promise<{ retailerId: string; name: string
 No passwords. The FE sends a `username`, the API resolves the shop.
 
 ```
-POST  /api/session         { "username": "suresh" }
+POST  /api/identify       { "username": "suresh" }
 ```
 ```jsonc
 // Response 200
@@ -150,7 +150,7 @@ PATCH  /api/inventory/:id  { inStock, price }    → Product
 **Scoping rule:** every query filters by the `shopId` from the header. A shop can never see another shop's orders or inventory.
 
 **Flow summary:**
-1. Dashboard loads → user types username → `POST /api/session`
+1. Dashboard loads → user types username → `POST /api/identify`
 2. FE stores `shopId` from response
 3. Every API call includes `X-Shop-Id: <shopId>` header
 4. Backend validates header, scopes all queries to that shop
@@ -232,7 +232,7 @@ Both sides should stub the other immediately: the edge hardcodes a `blocks` resp
 
 | Date | What changed | Why |
 |---|---|---|
-| 2026-09-16 | **§C2: Session added.** `POST /api/session { username }` → user + shop. All routes require `X-Shop-Id` header. No passwords — hackathon-grade auth. | `shop_user` table with unique `username` added to DB. FE needs a way to identify which shop to scope to. |
+| 2026-09-16 | **§C2: Session added.** `POST /api/identify { username }` → user + shop. All routes require `X-Shop-Id` header. No passwords — hackathon-grade auth. | `shop_user` table with unique `username` added to DB. FE needs a way to identify which shop to scope to. |
 | 2026-09-16 | **§C2: `/api/orders` → `/api/fulfillments`.** Dashboard shows the shop's fulfillment slice, not the customer's master order. | DB is multi-vendor: `master_order` (customer) → `fulfillment` (per-shop). Each shop only sees their fulfillments. |
 | 2026-09-16 | **§C2: Fulfillment status enum replaces order status enum.** Dashboard works with `accepted \| packed \| out_for_delivery \| delivered \| rejected`. `draft` and `placed` are master_order-only, never visible. | Auto-accept means fulfillments are born `accepted`. |
 | 2026-09-16 | **§C2: Status transition table added.** `accepted → packed → out_for_delivery → delivered`, with button labels. | Makes it unambiguous what the FE renders. |
@@ -248,8 +248,8 @@ The FE dev's analysis (`docs/frontend-contract.md`) proposed designs and raised 
 
 | FE proposed | BE decision |
 |---|---|
-| `POST /api/auth/login { identifier, password }` + httpOnly cookie | **Replaced.** `POST /api/session { username }` — no password, no cookie. FE gets `shopId` and sends it as `X-Shop-Id` header. |
-| `GET /api/auth/me` for session bootstrap | **Dropped.** FE just calls `/api/session` again on reload. |
+| `POST /api/auth/login { identifier, password }` + httpOnly cookie | **Replaced.** `POST /api/identify { username }` — no password, no cookie. FE gets `shopId` and sends it as `X-Shop-Id` header. |
+| `GET /api/auth/me` for session bootstrap | **Dropped.** FE just calls `/api/identify` again on reload. |
 | `POST /api/auth/logout` | **Dropped.** No session to clear. |
 | `retailerId` derived server-side, never sent by FE | **Changed.** FE explicitly sends `X-Shop-Id` header. Simpler for hackathon — no cookie/CORS complexity. Server validates the header value exists and is active. |
 | Q-A1 (cookie vs JWT) | **Neither.** Stateless header. |

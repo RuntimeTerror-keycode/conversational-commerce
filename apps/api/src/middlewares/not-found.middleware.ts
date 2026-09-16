@@ -14,6 +14,7 @@ export class NotFoundHandler {
 
     const response: ErrorResponse = {
       status: 'error',
+      code: 'not_found',
       message: 'Route not found',
     };
 
