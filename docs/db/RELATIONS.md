@@ -75,7 +75,7 @@ category
 ```
 shop_user → shop (shop_id)
 ```
-FE calls `POST /api/session` with `{ "username": "suresh" }`.
+FE calls `POST /api/identify` with `{ "username": "suresh" }`.
 API returns the `shop_user` + `shop`. FE stores `shop.id` and sends `X-Shop-Id` header on every call.
 
 **Retailer dashboard — list my fulfillments with customer info:**

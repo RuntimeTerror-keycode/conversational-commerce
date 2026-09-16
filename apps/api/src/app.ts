@@ -25,13 +25,18 @@ export class App {
   }
 
   private initializeMiddlewares(): void {
+    this.express.use(this.deps.middlewares.cors.handle);
     this.express.use(express.json());
     this.express.use(express.urlencoded({ extended: true }));
     this.express.use(this.deps.middlewares.requestLogger.handle);
   }
 
   private initializeRoutes(): void {
-    const registrar = new RouteRegistrar(this.express, this.deps.controllers.health);
+    const registrar = new RouteRegistrar(
+      this.express,
+      this.deps.controllers,
+      this.deps.middlewares,
+    );
     registrar.register();
   }
 
