@@ -4,6 +4,9 @@ install:
 	pnpm install
 	cd apps/edge && uv sync
 
+setup:
+	cd apps/api && npm install
+
 db:
 	docker compose up -d db rabbitmq
 
@@ -22,7 +25,7 @@ agent:
 	pnpm --filter agent dev
 
 api:
-	pnpm --filter api dev
+	cd apps/api && npx env-cmd npm run dev
 
 dashboard:
 	pnpm --filter dashboard dev
