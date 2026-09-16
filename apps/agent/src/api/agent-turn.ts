@@ -4,6 +4,7 @@ import { RequestContext } from "@mastra/core/request-context";
 import { mastra } from "../mastra/index.js";
 import { resolveRetailer } from "../mastra/tools/resolve-retailer.js";
 import { scopeFor } from "../mastra/memory/config.js";
+import { currentSession, rotateSession } from "../mastra/memory/session-store.js";
 import type { ShoppingContextValues } from "../mastra/context.js";
 
 const MAX_BODY_LENGTH = 1024;
@@ -31,12 +32,11 @@ export async function agentTurn(req: Request, res: Response) {
   const { retailerId, name: retailerName, area } = resolveRetailer(customerRef);
 
   // docs/contracts.md §A1 documents a reserved `sessionHint` field for this, but it
-  // isn't part of the actual AgentTurnRequest schema in packages/contracts yet.
-  // Falling back to customerRef gives a stable thread per customer, but this is a
-  // placeholder, not a real 30-min-idle/order-placed session boundary — needs either
-  // a sessionHint field added to the contract or edge-side session tracking later.
-  const sessionId = customerRef;
+  // isn't part of the actual AgentTurnRequest schema in packages/contracts yet, so
+  // sessions are tracked agent-side for now. Only the order-placed boundary rotates
+  // the thread — the 30-min idle boundary still needs sessionHint or edge tracking.
   const customerId = customerRef;
+  const sessionId = currentSession(customerId);
 
   const requestContext = new RequestContext<ShoppingContextValues>();
   requestContext.set("retailerId", retailerId);
@@ -65,15 +65,20 @@ export async function agentTurn(req: Request, res: Response) {
       }),
     );
 
+    const orderPlaced = wasOrderPlaced(result.steps);
+    if (orderPlaced) {
+      rotateSession(customerId);
+    }
+
     const response: AgentTurnResponse = {
       traceId,
-      sessionState: wasOrderPlaced(result.steps) ? "order_placed" : "active",
+      sessionState: orderPlaced ? "order_placed" : "active",
       blocks: [{ type: "text", body: truncate(result.text, MAX_BODY_LENGTH) }],
     };
 
     res.status(200).json(response);
   } catch (error) {
-    console.log(
+    console.error(
       JSON.stringify({
         traceId,
         customerId,
@@ -81,6 +86,7 @@ export async function agentTurn(req: Request, res: Response) {
         event: "agent_turn_error",
         latencyMs: Date.now() - startedAt,
         error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
       }),
     );
 
