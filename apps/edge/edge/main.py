@@ -54,6 +54,7 @@ app = FastAPI(
         {"name": "Messages", "description": "Send WhatsApp text messages."},
         {"name": "Orders", "description": "Dummy cart checkout and delivery address."},
         {"name": "Polls", "description": "Order confirmation Yes/No poll."},
+        {"name": "Products", "description": "Product found / choice polls."},
         {"name": "Location", "description": "Share or request a location."},
         {"name": "Audio", "description": "Transcribe voice (English / Malayalam mix)."},
         {"name": "Addresses", "description": "Saved customer addresses."},

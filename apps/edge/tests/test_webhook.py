@@ -85,6 +85,21 @@ def test_webhook_acks_valid_signature(monkeypatch):
     assert res.status_code == 200
 
 
+def test_webhook_acks_without_app_secret(monkeypatch):
+    monkeypatch.delenv("META_APP_SECRET", raising=False)
+    monkeypatch.delenv("WHATSAPP_APP_SECRET", raising=False)
+    client = TestClient(app)
+    body = json.dumps(WEBHOOK_PAYLOAD).encode("utf-8")
+
+    res = client.post(
+        "/webhook",
+        content=body,
+        headers={"Content-Type": "application/json"},
+    )
+
+    assert res.status_code == 200
+
+
 def test_health():
     client = TestClient(app)
     res = client.get("/health")

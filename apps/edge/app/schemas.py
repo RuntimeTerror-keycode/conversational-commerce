@@ -114,3 +114,35 @@ class AudioMediaRequest(BaseModel):
     destination: str = phone_field()
     media_id: str
     message_id: Optional[str] = None
+
+
+class ProductOption(BaseModel):
+
+    id: str = Field(
+        examples=["p_101"],
+        description="Product id returned when the customer taps this row.",
+    )
+    name: str = Field(examples=["Jaya rice 5kg"])
+    description: str = Field(
+        default="",
+        examples=["Matta"],
+        description="Brand, variant, or other short detail.",
+    )
+    price: float = Field(examples=[320])
+
+
+class ProductPollRequest(BaseModel):
+
+    destination: str = phone_field()
+    body: str = Field(
+        examples=["Rice ind. Ethu venam?"],
+        description="Question shown above the product choices.",
+    )
+    products: List[ProductOption] = Field(
+        min_length=1,
+        max_length=10,
+        description="Product options. One sure match or several choices.",
+    )
+    header: Optional[str] = Field(default="Found", examples=["Choice"])
+    footer: Optional[str] = None
+    list_button_text: str = Field(default="Choose product")
