@@ -8,3 +8,5 @@ __pycache__/
 .venv/
 *.db
 .DS_Store
+
+apps/api/package-lock.json

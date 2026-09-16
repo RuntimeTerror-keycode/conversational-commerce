@@ -31,7 +31,11 @@ Walking skeleton is in place: a message can travel edge → agent → back to
 edge with no AI in the loop yet.
 
 - `apps/edge` verifies the Meta webhook signature, acks 200 immediately, then
-  calls `apps/agent` in a background task and logs the stubbed outbound send.
+  calls `apps/agent` in a background task. Text, voice (Sarvam STT), location,
+  and button/list replies all become an agent turn. Outbound `ReplyBlock`s
+  are sent through the Meta Cloud API when a token is set, otherwise logged.
+  `POST /notify` renders retailer status updates the same way. `/docs` still
+  exposes the WhatsApp trigger endpoints for sending without a customer message.
 - `apps/agent` exposes `POST /agent/turn`, validates against
   `AgentTurnRequest` from `@cc/contracts`, and returns a hardcoded reply
   block.
@@ -46,8 +50,16 @@ edge with no AI in the loop yet.
     make db
     make agent      # terminal 1
     make api        # terminal 2
-    make edge       # terminal 3
+    make edge       # terminal 3 — or `make edge-docker`
     make dashboard  # terminal 4
+
+WhatsApp edge in Docker (ffmpeg + Meta webhook + STT):
+
+    cp .env.example .env   # fill Meta / Sarvam / ngrok keys
+    make edge-docker       # http://localhost:8000/docs
+
+The container reaches a host-side agent at `host.docker.internal:4111`.
+Keep `make agent` running if you want inbound WhatsApp turns to complete.
 
 ## Tests
 

@@ -14,9 +14,21 @@ if str(_CONTRACTS_DIR) not in sys.path:
 from contracts import (  # noqa: E402
     AgentTurnRequest,
     AgentTurnResponse,
+    ButtonsBlock,
+    CartSummaryBlock,
+    ListBlock,
     NotifyRequest,
     ReplyBlock,
     TextBlock,
 )
 
-__all__ = ["AgentTurnRequest", "AgentTurnResponse", "NotifyRequest", "ReplyBlock", "TextBlock"]
+__all__ = [
+    "AgentTurnRequest",
+    "AgentTurnResponse",
+    "ButtonsBlock",
+    "CartSummaryBlock",
+    "ListBlock",
+    "NotifyRequest",
+    "ReplyBlock",
+    "TextBlock",
+]

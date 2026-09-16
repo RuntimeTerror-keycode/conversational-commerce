@@ -58,7 +58,7 @@ def test_verify_meta_signature_rejects_missing_header():
 
 
 def test_webhook_rejects_bad_signature(monkeypatch):
-    monkeypatch.setenv("WHATSAPP_APP_SECRET", APP_SECRET)
+    monkeypatch.setenv("META_APP_SECRET", APP_SECRET)
     client = TestClient(app)
 
     res = client.post(
@@ -71,7 +71,7 @@ def test_webhook_rejects_bad_signature(monkeypatch):
 
 
 def test_webhook_acks_valid_signature(monkeypatch):
-    monkeypatch.setenv("WHATSAPP_APP_SECRET", APP_SECRET)
+    monkeypatch.setenv("META_APP_SECRET", APP_SECRET)
     client = TestClient(app)
     body = json.dumps(WEBHOOK_PAYLOAD).encode("utf-8")
     sig = _sign(body, APP_SECRET)
@@ -83,3 +83,61 @@ def test_webhook_acks_valid_signature(monkeypatch):
     )
 
     assert res.status_code == 200
+
+
+def test_webhook_acks_without_app_secret(monkeypatch):
+    monkeypatch.delenv("META_APP_SECRET", raising=False)
+    monkeypatch.delenv("WHATSAPP_APP_SECRET", raising=False)
+    client = TestClient(app)
+    body = json.dumps(WEBHOOK_PAYLOAD).encode("utf-8")
+
+    res = client.post(
+        "/webhook",
+        content=body,
+        headers={"Content-Type": "application/json"},
+    )
+
+    assert res.status_code == 200
+
+
+def test_health():
+    client = TestClient(app)
+    res = client.get("/health")
+    assert res.status_code == 200
+    assert res.json() == {"ok": True, "service": "edge"}
+
+
+def test_notify_rejects_bad_token(monkeypatch):
+    monkeypatch.setenv("SERVICE_SHARED_SECRET", "edge-secret")
+    client = TestClient(app)
+
+    res = client.post(
+        "/notify",
+        json={
+            "traceId": "trc_test",
+            "customerRef": "919999999999",
+            "blocks": [{"type": "text", "body": "order accepted"}],
+            "reason": "order_accepted",
+        },
+        headers={"X-Service-Token": "wrong"},
+    )
+
+    assert res.status_code == 401
+
+
+def test_notify_accepts_valid_token(monkeypatch):
+    monkeypatch.setenv("SERVICE_SHARED_SECRET", "edge-secret")
+    client = TestClient(app)
+
+    res = client.post(
+        "/notify",
+        json={
+            "traceId": "trc_test",
+            "customerRef": "919999999999",
+            "blocks": [{"type": "text", "body": "order accepted"}],
+            "reason": "order_accepted",
+        },
+        headers={"X-Service-Token": "edge-secret"},
+    )
+
+    assert res.status_code == 202
