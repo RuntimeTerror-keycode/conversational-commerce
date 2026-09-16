@@ -1,8 +1,10 @@
-import { createServer } from "./server.js";
+import { Setup } from './setup';
+import { App } from './app';
 
-const port = Number(process.env.PORT ?? 4000);
-const app = createServer();
+function bootstrap(): void {
+  const deps = Setup.createDependencies();
+  const app = new App(deps);
+  app.listen();
+}
 
-app.listen(port, () => {
-  console.log(`api listening on :${port}`);
-});
+bootstrap();
