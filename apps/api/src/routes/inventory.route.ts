@@ -7,12 +7,11 @@ export class InventoryRoute {
 
   constructor(controller: InventoryController, shopContext: ShopContextMiddleware) {
     this.router = Router();
-    this.router.use(shopContext.handle);
-    this.initializeRoutes(controller);
+    this.initializeRoutes(controller, shopContext);
   }
 
-  private initializeRoutes(controller: InventoryController): void {
-    this.router.get('/inventory', controller.list);
-    this.router.patch('/inventory/:id', controller.update);
+  private initializeRoutes(controller: InventoryController, shopContext: ShopContextMiddleware): void {
+    this.router.get('/inventory', shopContext.handle, controller.list);
+    this.router.patch('/inventory/:id', shopContext.handle, controller.update);
   }
 }

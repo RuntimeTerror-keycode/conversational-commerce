@@ -1,3 +1,5 @@
+import { PoolClient } from 'pg';
+
 import { Database } from '../lib/db';
 
 // ---------------------------------------------------------------------------
@@ -81,6 +83,27 @@ export class OrderItemRepository {
        SET shop_product_id = $1, unit_price = $2, total_price = $3
        WHERE id = $4`,
       [productId, unitPrice, totalPrice, lineId],
+    );
+  }
+
+  /** Batch insert order items within a transaction (order placement). */
+  public async insertBatchTx(
+    client: PoolClient,
+    items: { fulfillmentId: number; shopProductId: number; quantity: number; unitPrice: number }[],
+  ): Promise<void> {
+    if (items.length === 0) return;
+    const values: unknown[] = [];
+    const rows: string[] = [];
+    let idx = 1;
+    for (const item of items) {
+      rows.push(`($${idx}, $${idx + 1}, $${idx + 2}, $${idx + 3}, $${idx + 4})`);
+      values.push(item.fulfillmentId, item.shopProductId, item.quantity, item.unitPrice, item.unitPrice * item.quantity);
+      idx += 5;
+    }
+    await client.query(
+      `INSERT INTO order_item (fulfillment_id, shop_product_id, quantity, unit_price, total_price)
+       VALUES ${rows.join(', ')}`,
+      values,
     );
   }
 

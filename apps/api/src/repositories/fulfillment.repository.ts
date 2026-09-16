@@ -158,6 +158,22 @@ export class FulfillmentRepository {
     );
   }
 
+  /** Create a fulfillment row within a transaction (order placement). */
+  public async insertTx(
+    client: PoolClient,
+    masterOrderId: number,
+    shopId: number,
+    subtotal: number,
+  ): Promise<number> {
+    const result = await client.query<{ id: number }>(
+      `INSERT INTO fulfillment (master_order_id, shop_id, status, subtotal, accepted_at, updated_at)
+       VALUES ($1, $2, 'accepted', $3, NOW(), NOW())
+       RETURNING id`,
+      [masterOrderId, shopId, subtotal],
+    );
+    return result.rows[0].id;
+  }
+
   public async recalcSubtotal(fulfillmentId: number): Promise<void> {
     await this.db.query(
       `UPDATE fulfillment

@@ -164,6 +164,41 @@ export class ShopProductRepository {
     return result.rows[0];
   }
 
+  /** Cheapest selling price per catalog item across given shops. */
+  public async cheapestPrices(
+    catalogIds: number[],
+    shopIds: number[],
+  ): Promise<{ catalog_id: number; price: number }[]> {
+    if (catalogIds.length === 0 || shopIds.length === 0) return [];
+    const result = await this.db.query<{ catalog_id: number; price: number }>(
+      `SELECT catalog_id, MIN(selling_price)::float AS price
+       FROM shop_product
+       WHERE catalog_id = ANY($1::int[])
+         AND shop_id = ANY($2::int[])
+         AND is_available = true
+         AND stock_quantity > 0
+       GROUP BY catalog_id`,
+      [catalogIds, shopIds],
+    );
+    return result.rows;
+  }
+
+  /** Find the shop_product row for a catalog item at a specific shop. */
+  public async findByCatalogAndShop(
+    catalogId: number,
+    shopId: number,
+  ): Promise<{ id: number; selling_price: string; is_available: boolean; stock_quantity: number } | null> {
+    const result = await this.db.query<{
+      id: number; selling_price: string; is_available: boolean; stock_quantity: number;
+    }>(
+      `SELECT id, selling_price, is_available, stock_quantity
+       FROM shop_product
+       WHERE catalog_id = $1 AND shop_id = $2`,
+      [catalogId, shopId],
+    );
+    return result.rows[0] ?? null;
+  }
+
   private buildWhereClause(shopId: number, q?: string, category?: string, stockState?: string) {
     const conditions: string[] = ['sp.shop_id = $1'];
     const values: unknown[] = [shopId];

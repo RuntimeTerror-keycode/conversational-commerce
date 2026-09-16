@@ -41,3 +41,27 @@ export type StockStateFilter = typeof stockStateFilters[number];
 export const defaultPageLimit = 20;
 export const maxPageLimit = 100;
 export const defaultInventoryLimit = 50;
+
+// ---------------------------------------------------------------------------
+// Domain API defaults
+// ---------------------------------------------------------------------------
+
+export const defaultSearchLimit = 3;
+export const maxSearchLimit = 10;
+export const confirmationTokenTtlMinutes = 5;
+export const defaultEtaMinutes = 30;
+export const minFulfillmentAmount = 400;
+
+// ---------------------------------------------------------------------------
+// Cart operations
+// ---------------------------------------------------------------------------
+
+export const cartActions = ['add', 'remove', 'set'] as const;
+export type CartAction = typeof cartActions[number];
+
+// ---------------------------------------------------------------------------
+// Master order statuses
+// ---------------------------------------------------------------------------
+
+export const masterOrderStatuses = ['draft', 'placed', 'accepted', 'rejected', 'delivered'] as const;
+export type MasterOrderStatus = typeof masterOrderStatuses[number];
