@@ -3,8 +3,8 @@ import { createRoot } from 'react-dom/client';
 import { RouterProvider } from 'react-router-dom';
 import { Providers } from './app/Providers';
 import { router } from './app/router';
+import '@fontsource-variable/inter';
 import './index.css';
-
 const container = document.getElementById('root');
 if (!container) throw new Error('#root missing from index.html');
 

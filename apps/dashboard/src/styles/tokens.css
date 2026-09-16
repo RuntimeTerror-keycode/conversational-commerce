@@ -1,0 +1,127 @@
+/* ============================================================
+   Shopkeeper Portal — Design Tokens
+   Derived from the design brief (section 3, Design System).
+
+   Colors are stored as space-separated RGB channels so Tailwind's
+   opacity modifiers work: bg-surface/50, text-accent/80, etc.
+   Hex equivalents are noted in comments.
+
+   Import once at the top of src/index.css, before @tailwind.
+   ============================================================ */
+
+:root {
+  /* ---------- Brand / accent ---------------------------------
+     Brief: Primary #2563EB                                     */
+  --color-accent:          37 99 235;    /* #2563EB */
+  --color-accent-hover:    29 78 216;    /* #1D4ED8 */
+  --color-accent-active:   30 64 175;    /* #1E40AF */
+  --color-accent-subtle:   239 246 255;  /* #EFF6FF  tinted backgrounds */
+  --color-accent-border:   191 219 254;  /* #BFDBFE */
+  --color-on-accent:       255 255 255;  /* #FFFFFF  text on accent fills */
+
+  /* ---------- Text -------------------------------------------
+     Brief: Text #0F172A, Muted #64748B                         */
+  --color-text-primary:    15 23 42;     /* #0F172A  13.6:1 on white */
+  --color-text-secondary:  71 85 105;    /* #475569   7.4:1 on white */
+  --color-text-muted:      100 116 139;  /* #64748B   4.8:1 — AA body, min size 14px */
+  --color-text-disabled:   148 163 184;  /* #94A3B8   decorative only, never body copy */
+  --color-text-inverse:    248 250 252;  /* #F8FAFC  on dark surfaces */
+
+  /* ---------- Surfaces ---------------------------------------- */
+  --color-canvas:          248 250 252;  /* #F8FAFC  app background */
+  --color-surface:         255 255 255;  /* #FFFFFF  cards, tables, panels */
+  --color-surface-raised:  255 255 255;  /* #FFFFFF  modals, popovers (+ shadow) */
+  --color-surface-sunken:  241 245 249;  /* #F1F5F9  table headers, inset wells */
+  --color-surface-hover:   248 250 252;  /* #F8FAFC  row / list-item hover */
+
+  /* ---------- Borders ----------------------------------------- */
+  --color-border:          226 232 240;  /* #E2E8F0  default hairline */
+  --color-border-strong:   203 213 225;  /* #CBD5E1  inputs, dividers */
+  --color-border-focus:    37 99 235;    /* #2563EB */
+
+  /* ---------- Sidebar (dark navy shell) -----------------------
+     Matches the dark navigation rail in the reference mockups.  */
+  --color-sidebar:             15 23 42;     /* #0F172A */
+  --color-sidebar-hover:       30 41 59;     /* #1E293B */
+  --color-sidebar-active:      37 99 235;    /* #2563EB */
+  --color-sidebar-text:        148 163 184;  /* #94A3B8 */
+  --color-sidebar-text-active: 255 255 255;  /* #FFFFFF */
+  --color-sidebar-border:      30 41 59;     /* #1E293B */
+
+  /* ---------- Semantic status --------------------------------
+     Brief: Success #10B981, Warning #F59E0B, Error #EF4444.
+
+     IMPORTANT: the -base values below FAIL WCAG AA as text on
+     white (emerald ~2.5:1, amber ~2.1:1). Use -base only for
+     fills, icons >=24px, and progress indicators. For any text
+     or badge label, use the -fg value on the -bg value.         */
+
+  --color-success:         16 185 129;   /* #10B981  fills / icons only */
+  --color-success-bg:      209 250 229;  /* #D1FAE5 */
+  --color-success-fg:      4 120 87;     /* #047857  6.4:1 on success-bg */
+  --color-success-border:  167 243 208;  /* #A7F3D0 */
+
+  --color-warning:         245 158 11;   /* #F59E0B  fills / icons only */
+  --color-warning-bg:      254 243 199;  /* #FEF3C7 */
+  --color-warning-fg:      180 83 9;     /* #B45309  5.9:1 on warning-bg */
+  --color-warning-border:  253 230 138;  /* #FDE68A */
+
+  --color-danger:          239 68 68;    /* #EF4444 */
+  --color-danger-hover:    220 38 38;    /* #DC2626 */
+  --color-danger-bg:       254 226 226;  /* #FEE2E2 */
+  --color-danger-fg:       185 28 28;    /* #B91C1C  6.5:1 on danger-bg */
+  --color-danger-border:   254 202 202;  /* #FECACA */
+
+  --color-info:            37 99 235;    /* #2563EB  reuses accent */
+  --color-info-bg:         219 234 254;  /* #DBEAFE */
+  --color-info-fg:         29 78 216;    /* #1D4ED8 */
+  --color-info-border:     191 219 254;  /* #BFDBFE */
+
+  /* Violet — used by the "Shipped" badge in the reference row.
+     Not in the brief's six swatches; added for completeness.    */
+  --color-violet:          124 58 237;   /* #7C3AED */
+  --color-violet-bg:       237 233 254;  /* #EDE9FE */
+  --color-violet-fg:       109 40 217;   /* #6D28D9 */
+  --color-violet-border:   221 214 254;  /* #DDD6FE */
+
+  /* Neutral — for "Draft", "Unknown", inactive states */
+  --color-neutral-bg:      241 245 249;  /* #F1F5F9 */
+  --color-neutral-fg:      51 65 85;     /* #334155 */
+  --color-neutral-border:  226 232 240;  /* #E2E8F0 */
+
+  /* ---------- Focus ring --------------------------------------
+     Applied as a 2px ring with a 2px offset so it reads on both
+     light surfaces and inside dense table rows.                 */
+  --ring-width:  2px;
+  --ring-offset: 2px;
+
+  /* ---------- Elevation ---------------------------------------
+     Low-spread, slate-tinted. Avoid pure-black shadows.         */
+  --shadow-xs: 0 1px 2px 0 rgb(15 23 42 / 0.04);
+  --shadow-sm: 0 1px 3px 0 rgb(15 23 42 / 0.08), 0 1px 2px -1px rgb(15 23 42 / 0.04);
+  --shadow-md: 0 4px 12px -2px rgb(15 23 42 / 0.08), 0 2px 4px -2px rgb(15 23 42 / 0.04);
+  --shadow-lg: 0 12px 24px -4px rgb(15 23 42 / 0.10), 0 4px 8px -4px rgb(15 23 42 / 0.04);
+
+  /* ---------- Motion ------------------------------------------ */
+  --duration-fast: 150ms;  /* color, opacity, hover */
+  --duration-base: 200ms;  /* small layout, dropdowns */
+  --duration-slow: 300ms;  /* modals, drawers, page transitions */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in:  cubic-bezier(0.4, 0, 1, 1);
+}
+
+/* Reduced motion — collapse all transitions rather than removing
+   them, so state changes still register instantly. */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --duration-fast: 0.01ms;
+    --duration-base: 0.01ms;
+    --duration-slow: 0.01ms;
+  }
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
