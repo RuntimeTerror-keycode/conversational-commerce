@@ -17,10 +17,25 @@ services:
       RABBITMQ_DEFAULT_USER: kadakaran
       RABBITMQ_DEFAULT_PASS: kadakaran
     ports:
-      - "5672:5672"       # AMQP
-      - "15672:15672"     # Management UI
+      - "5672:5672"
+      - "15672:15672"
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
+
+  edge:
+    build:
+      context: .
+      dockerfile: apps/edge/Dockerfile
+    ports: ["8000:8000"]
+    env_file:
+      - path: .env
+        required: false
+      - path: apps/edge/.env
+        required: false
+    environment:
+      AGENT_TURN_URL: ${EDGE_AGENT_TURN_URL:-http://host.docker.internal:4111/agent/turn}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
 volumes:
   pgdata:
