@@ -1,8 +1,26 @@
-import { createServer } from "./server.js";
+import { Setup } from './setup';
+import { App } from './app';
 
-const port = Number(process.env.PORT ?? 4000);
-const app = createServer();
+async function bootstrap(): Promise<void> {
+  const deps = Setup.createDependencies();
 
-app.listen(port, () => {
-  console.log(`api listening on :${port}`);
+  await deps.broker.connect();
+
+  const app = new App(deps);
+  app.listen();
+
+  const shutdown = async () => {
+    deps.logger.info('Shutting down...');
+    await deps.broker.close();
+    await deps.db.close();
+    process.exit(0);
+  };
+
+  process.on('SIGINT', shutdown);
+  process.on('SIGTERM', shutdown);
+}
+
+bootstrap().catch((err) => {
+  console.error('Failed to start', err);
+  process.exit(1);
 });

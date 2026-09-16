@@ -2,11 +2,25 @@ services:
   db:
     image: pgvector/pgvector:pg16
     environment:
-      POSTGRES_USER: cc
-      POSTGRES_PASSWORD: cc
-      POSTGRES_DB: cc
+      POSTGRES_USER: kadakaran
+      POSTGRES_PASSWORD: kadakaran
+      POSTGRES_DB: kadakaran
     ports: ["5432:5432"]
-    volumes: ["pgdata:/var/lib/postgresql/data"]
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./docs/db/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ./docs/db/seed.sql:/docker-entrypoint-initdb.d/02-seed.sql:ro
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    environment:
+      RABBITMQ_DEFAULT_USER: kadakaran
+      RABBITMQ_DEFAULT_PASS: kadakaran
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
 
   edge:
     build:
@@ -19,10 +33,10 @@ services:
       - path: apps/edge/.env
         required: false
     environment:
-      # Agent still runs on the host in the walking skeleton.
       AGENT_TURN_URL: ${EDGE_AGENT_TURN_URL:-http://host.docker.internal:4111/agent/turn}
     extra_hosts:
       - "host.docker.internal:host-gateway"
 
 volumes:
   pgdata:
+  rabbitmq_data:
