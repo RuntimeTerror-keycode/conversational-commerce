@@ -1,0 +1,6 @@
+packages:
+  - "apps/agent"
+  - "apps/api"
+  - "apps/dashboard"
+  - "apps/mcp"
+  - "packages/*"
