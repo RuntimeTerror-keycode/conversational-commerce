@@ -22,14 +22,19 @@ async def lifespan(_app: FastAPI):
 
     import ngrok
 
-    forwarder = await ngrok.forward(
-        "localhost:8000",
-        authtoken_from_env=True,
-        domain=settings.ngrok_domain,
-    )
-    public_url = forwarder.url()
-    logger.info("Webhook URL: %s/webhook", public_url)
-    logger.info("API docs: %s/docs", public_url)
+    try:
+        forwarder = await ngrok.forward(
+            "localhost:8000",
+            authtoken_from_env=True,
+            domain=settings.ngrok_domain,
+        )
+        public_url = forwarder.url()
+        logger.info("Webhook URL: %s/webhook", public_url)
+        logger.info("API docs: %s/docs", public_url)
+    except Exception:
+        logger.exception("ngrok_failed — serving locally on :8000")
+        yield
+        return
 
     yield
 

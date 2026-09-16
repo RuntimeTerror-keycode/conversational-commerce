@@ -50,8 +50,16 @@ edge with no AI in the loop yet.
     make db
     make agent      # terminal 1
     make api        # terminal 2
-    make edge       # terminal 3
+    make edge       # terminal 3 — or `make edge-docker`
     make dashboard  # terminal 4
+
+WhatsApp edge in Docker (ffmpeg + Meta webhook + STT):
+
+    cp .env.example .env   # fill Meta / Sarvam / ngrok keys
+    make edge-docker       # http://localhost:8000/docs
+
+The container reaches a host-side agent at `host.docker.internal:4111`.
+Keep `make agent` running if you want inbound WhatsApp turns to complete.
 
 ## Tests
 

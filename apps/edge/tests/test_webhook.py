@@ -58,7 +58,7 @@ def test_verify_meta_signature_rejects_missing_header():
 
 
 def test_webhook_rejects_bad_signature(monkeypatch):
-    monkeypatch.setenv("WHATSAPP_APP_SECRET", APP_SECRET)
+    monkeypatch.setenv("META_APP_SECRET", APP_SECRET)
     client = TestClient(app)
 
     res = client.post(
@@ -71,7 +71,7 @@ def test_webhook_rejects_bad_signature(monkeypatch):
 
 
 def test_webhook_acks_valid_signature(monkeypatch):
-    monkeypatch.setenv("WHATSAPP_APP_SECRET", APP_SECRET)
+    monkeypatch.setenv("META_APP_SECRET", APP_SECRET)
     client = TestClient(app)
     body = json.dumps(WEBHOOK_PAYLOAD).encode("utf-8")
     sig = _sign(body, APP_SECRET)

@@ -16,6 +16,7 @@ def _first(*names: str, default: str | None = None) -> str | None:
 META_ACCESS_TOKEN = _first("META_ACCESS_TOKEN", "WHATSAPP_TOKEN")
 META_PHONE_NUMBER_ID = _first("META_PHONE_NUMBER_ID", "WHATSAPP_PHONE_NUMBER_ID")
 META_API_VERSION = os.getenv("META_API_VERSION", "v23.0")
+META_APP_SECRET = _first("META_APP_SECRET", "WHATSAPP_APP_SECRET", default="")
 
 VERIFY_TOKEN = _first("VERIFY_TOKEN", "WHATSAPP_VERIFY_TOKEN", default="")
 

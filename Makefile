@@ -1,4 +1,4 @@
-.PHONY: dev db agent api edge dashboard install
+.PHONY: dev db agent api edge edge-docker dashboard install
 
 install:
 	pnpm install
@@ -18,6 +18,9 @@ dashboard:
 
 edge:
 	cd apps/edge && uv run uvicorn edge.main:app --reload --port 8000
+
+edge-docker:
+	docker compose up --build edge
 
 dev: db
 	@echo "Run these in separate terminals: make agent / make api / make edge / make dashboard"
