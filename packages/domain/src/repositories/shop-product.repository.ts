@@ -1,3 +1,4 @@
+import { PoolClient } from 'pg';
 import {
   IDatabase,
   ShopProductRow,
@@ -147,6 +148,53 @@ export class ShopProductRepository {
       [catalogId, shopId],
     );
     return result.rows[0] ?? null;
+  }
+
+  /** Insert or update a shop_product row keyed on (shop_id, catalog_id). */
+  public async upsertTx(
+    client: PoolClient,
+    shopId: number,
+    catalogId: number,
+    regularPrice: number,
+    sellingPrice: number,
+    stockQuantity: number,
+    isAvailable: boolean,
+  ): Promise<void> {
+    await client.query(
+      `INSERT INTO shop_product (shop_id, catalog_id, regular_price, selling_price, stock_quantity, is_available, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, NOW())
+       ON CONFLICT (shop_id, catalog_id) DO UPDATE SET
+         regular_price  = EXCLUDED.regular_price,
+         selling_price  = EXCLUDED.selling_price,
+         stock_quantity = EXCLUDED.stock_quantity,
+         is_available   = EXCLUDED.is_available,
+         updated_at     = NOW()`,
+      [shopId, catalogId, regularPrice, sellingPrice, stockQuantity, isAvailable],
+    );
+  }
+
+  /**
+   * Mark every shop_product for this shop that is NOT in the given catalog_id
+   * set as unavailable (stock 0). Used after a full-state inventory sync so
+   * products absent from the push don't linger as available.
+   */
+  public async markStaleUnavailableTx(
+    client: PoolClient,
+    shopId: number,
+    freshCatalogIds: number[],
+  ): Promise<number> {
+    if (freshCatalogIds.length === 0) return 0;
+
+    const result = await client.query<{ count: number }>(
+      `UPDATE shop_product
+       SET is_available = false, stock_quantity = 0, updated_at = NOW()
+       WHERE shop_id = $1
+         AND catalog_id != ALL($2::int[])
+         AND is_available = true
+       RETURNING id`,
+      [shopId, freshCatalogIds],
+    );
+    return result.rowCount ?? 0;
   }
 
   private buildWhereClause(shopId: number, q?: string, category?: string, stockState?: string) {

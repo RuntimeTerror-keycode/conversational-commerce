@@ -13,6 +13,7 @@ export * from './constants';
 // Repositories
 export { CustomerRepository } from './repositories/customer.repository';
 export { ShopRepository } from './repositories/shop.repository';
+export { CategoryRepository } from './repositories/category.repository';
 export { CatalogRepository } from './repositories/catalog.repository';
 export { CartRepository } from './repositories/cart.repository';
 export { MasterOrderRepository } from './repositories/master-order.repository';

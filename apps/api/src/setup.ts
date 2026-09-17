@@ -12,6 +12,7 @@ import {
   ShopProductRepository,
   CustomerRepository,
   ShopRepository,
+  CategoryRepository,
   CatalogRepository,
   CartRepository,
   MasterOrderRepository,
@@ -39,6 +40,7 @@ import { CartOrchestrationService } from './services/cart-orchestration.service'
 import { EdgeNotifyClient } from './lib/edge-notify-client';
 import { NotifyService } from './services/notify.service';
 import { OrderNotifyService } from './services/order-notify.service';
+import { InventorySyncService } from './services/inventory-sync.service';
 
 // Controllers
 import { HealthController } from './controllers/health.controller';
@@ -50,6 +52,7 @@ import { CatalogController } from './controllers/catalog.controller';
 import { CartController } from './controllers/cart.controller';
 import { OrderController } from './controllers/order.controller';
 import { WhatsappController } from './controllers/whatsapp.controller';
+import { InventorySyncController } from './controllers/inventory-sync.controller';
 
 // Middlewares
 import { RequestLogger } from './middlewares/request-logger.middleware';
@@ -69,6 +72,7 @@ export interface AppControllers {
   cart: CartController;
   order: OrderController;
   whatsapp: WhatsappController;
+  inventorySync: InventorySyncController;
 }
 
 export interface AppMiddlewares {
@@ -104,6 +108,7 @@ export class Setup {
     const shopProductRepo = new ShopProductRepository(db);
     const customerRepo = new CustomerRepository(db);
     const shopRepo = new ShopRepository(db);
+    const categoryRepo = new CategoryRepository(db);
     const catalogRepo = new CatalogRepository(db);
     const cartRepo = new CartRepository(db);
     const masterOrderRepo = new MasterOrderRepository(db);
@@ -140,6 +145,11 @@ export class Setup {
     });
     const sessionService = new SessionService(customerRepo, masterOrderRepo, messageRepo, logger);
 
+    // Inventory sync (external POS webhook → RabbitMQ → DB)
+    const inventorySyncService = new InventorySyncService(
+      broker, db, categoryRepo, catalogRepo, shopProductRepo, logger,
+    );
+
     // WhatsApp orchestration
     const whatsappService = new WhatsappService(
       sessionService, retailerService, catalogService, cartService, logger,
@@ -164,6 +174,7 @@ export class Setup {
         cart: new CartController(cartOrchestrationService),
         order: new OrderController(orderPlacementService, orderNotifyService),
         whatsapp: new WhatsappController(whatsappService),
+        inventorySync: new InventorySyncController(inventorySyncService),
       },
       middlewares: {
         cors: new CorsMiddleware(),
