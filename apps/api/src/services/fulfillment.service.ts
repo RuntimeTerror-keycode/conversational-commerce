@@ -242,38 +242,41 @@ export class FulfillmentService {
       throw AppError.notFound('Line item not found');
     }
 
-    let substitution: { oldName: string; newName: string } | null = null;
+    const substitution = await this.db.transaction<{ oldName: string; newName: string } | null>(async (client) => {
+      let result: { oldName: string; newName: string } | null = null;
 
-    if (remove) {
-      await this.orderItemRepo.delete(lineId);
-    } else if (substituteProductId) {
-      const existingItems = await this.orderItemRepo.findByFulfillment(fulfillmentId);
-      const existing = existingItems.find((i) => i.lineId === lineId);
+      if (remove) {
+        await this.orderItemRepo.delete(client, lineId);
+      } else if (substituteProductId) {
+        const existingItems = await this.orderItemRepo.findByFulfillment(fulfillmentId);
+        const existing = existingItems.find((i) => i.lineId === lineId);
 
-      if (existing?.shopProductId !== substituteProductId) {
-        const product = await this.shopProductRepo.findForSubstitute(substituteProductId, shopId);
-        if (!product) {
-          throw AppError.notFound('Substitute product not found in this shop');
+        if (existing?.shopProductId !== substituteProductId) {
+          const product = await this.shopProductRepo.findForSubstitute(substituteProductId, shopId);
+          if (!product) {
+            throw AppError.notFound('Substitute product not found in this shop');
+          }
+          const oldName = existing?.productName ?? 'an item';
+          const qty = await this.orderItemRepo.getQuantity(lineId);
+          const newPrice = parseFloat(product.selling_price);
+          await this.orderItemRepo.substitute(client, lineId, substituteProductId, newPrice, newPrice * qty);
+          result = { oldName, newName: product.local_name ?? 'a substitute item' };
         }
-        const oldName = existing?.productName ?? 'an item';
-        const qty = await this.orderItemRepo.getQuantity(lineId);
-        const newPrice = parseFloat(product.selling_price);
-        await this.orderItemRepo.substitute(lineId, substituteProductId, newPrice, newPrice * qty);
-        substitution = { oldName, newName: product.local_name ?? 'a substitute item' };
+        // else: substituteProductId matches the item's current product — a no-op,
+        // skip the write and the customer notification.
+      } else if (quantity !== undefined) {
+        if (!Number.isInteger(quantity) || quantity < 1) {
+          throw AppError.validation('quantity must be a positive integer');
+        }
+        const unitPrice = parseFloat(item.unit_price);
+        await this.orderItemRepo.updateQuantity(client, lineId, quantity, unitPrice * quantity);
+      } else {
+        throw AppError.validation('Provide quantity, substituteProductId, or remove');
       }
-      // else: substituteProductId matches the item's current product — a no-op,
-      // skip the write and the customer notification.
-    } else if (quantity !== undefined) {
-      if (!Number.isInteger(quantity) || quantity < 1) {
-        throw AppError.validation('quantity must be a positive integer');
-      }
-      const unitPrice = parseFloat(item.unit_price);
-      await this.orderItemRepo.updateQuantity(lineId, quantity, unitPrice * quantity);
-    } else {
-      throw AppError.validation('Provide quantity, substituteProductId, or remove');
-    }
 
-    await this.fulfillmentRepo.recalcSubtotal(fulfillmentId);
+      await this.fulfillmentRepo.recalcSubtotal(client, fulfillmentId);
+      return result;
+    });
 
     this.logger.info('Line item updated', { fulfillmentId, lineId, shopId });
 
