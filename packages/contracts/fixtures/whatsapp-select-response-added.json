@@ -1,0 +1,13 @@
+{
+  "customerRef": "919999999999",
+  "orderId": 1,
+  "tag": "added",
+  "cart": {
+    "items": [
+      { "lineId": "1", "productName": "Jaya Rice 5kg Bag", "quantity": 1, "unit": "kg", "price": 310 }
+    ],
+    "total": 310,
+    "currency": "INR",
+    "priceNote": "Prices are indicative (cheapest nearby). Final price confirmed at checkout."
+  }
+}

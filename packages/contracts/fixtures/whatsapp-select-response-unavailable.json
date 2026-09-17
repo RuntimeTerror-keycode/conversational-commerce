@@ -1,0 +1,9 @@
+{
+  "customerRef": "919999999999",
+  "orderId": 1,
+  "tag": "unavailable",
+  "body": "That item just went out of stock at Krishna Supermart.",
+  "substitutes": [
+    { "id": 23, "name": "Palakkadan Matta Rice", "unit": "kg", "price": 365 }
+  ]
+}

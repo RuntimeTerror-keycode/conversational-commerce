@@ -62,3 +62,103 @@ class NotifyRequest(BaseModel):
     customerRef: str
     blocks: list[ReplyBlock] = Field(max_length=2)
     reason: Literal["order_accepted", "order_rejected", "out_for_delivery", "substitution"]
+
+
+# ---------------------------------------------------------------------------
+# WhatsApp order search/select — POST /api/whatsapp/orders/{search,select}
+# Deliberate, temporary bypass of the agent (see root spec.md §14 item 13);
+# apps/edge calls apps/api directly and renders the response synchronously.
+# ---------------------------------------------------------------------------
+
+class WhatsappAddress(BaseModel):
+    addressLine: Optional[str] = None
+    latitude: float
+    longitude: float
+
+
+class WhatsappSearchRequest(BaseModel):
+    messageId: str
+    customerRef: str
+    text: str
+    source: Literal["text", "voice"]
+    timestamp: str
+    address: WhatsappAddress
+    paymentMode: Literal["COD", "GPAY"]
+
+
+class WhatsappRow(BaseModel):
+    id: int
+    title: str
+    description: Optional[str] = None
+    price: str
+
+
+class WhatsappFoundResponse(BaseModel):
+    customerRef: str
+    orderId: int
+    tag: Literal["found"]
+    rows: list[WhatsappRow]
+
+
+class WhatsappChoiceResponse(BaseModel):
+    customerRef: str
+    orderId: int
+    tag: Literal["choice"]
+    body: str
+    rows: list[WhatsappRow]
+
+
+class WhatsappNotFoundResponse(BaseModel):
+    customerRef: str
+    orderId: int
+    tag: Literal["not_found"]
+    body: str
+
+
+WhatsappSearchResponse = Union[WhatsappFoundResponse, WhatsappChoiceResponse, WhatsappNotFoundResponse]
+
+
+class WhatsappSelectRequest(BaseModel):
+    customerRef: str
+    orderId: int
+    productId: int
+
+
+class WhatsappCartLine(BaseModel):
+    lineId: str
+    productName: str
+    quantity: float
+    unit: str
+    price: float
+
+
+class WhatsappCart(BaseModel):
+    items: list[WhatsappCartLine]
+    total: float
+    currency: Literal["INR"]
+    priceNote: Optional[str] = None
+
+
+class WhatsappSubstitute(BaseModel):
+    id: int
+    name: str
+    unit: str
+    price: float
+
+
+class WhatsappAddedResponse(BaseModel):
+    customerRef: str
+    orderId: int
+    tag: Literal["added"]
+    cart: WhatsappCart
+
+
+class WhatsappUnavailableResponse(BaseModel):
+    customerRef: str
+    orderId: int
+    tag: Literal["unavailable"]
+    body: str
+    substitutes: list[WhatsappSubstitute]
+
+
+WhatsappSelectResponse = Union[WhatsappAddedResponse, WhatsappUnavailableResponse]

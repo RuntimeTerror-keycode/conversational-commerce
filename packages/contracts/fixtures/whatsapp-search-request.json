@@ -1,0 +1,13 @@
+{
+  "messageId": "wamid.demo001",
+  "customerRef": "919999999999",
+  "text": "Is there 20 kilos rice available?",
+  "source": "text",
+  "timestamp": "1700000000",
+  "address": {
+    "addressLine": "",
+    "latitude": 10.0159,
+    "longitude": 76.3419
+  },
+  "paymentMode": "COD"
+}

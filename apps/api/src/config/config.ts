@@ -4,6 +4,7 @@ export interface AppConfig {
   logLevel: string;
   databaseUrl: string;
   rabbitmqUrl: string;
+  serviceSharedSecret: string;
 }
 
 export class Config {
@@ -17,6 +18,7 @@ export class Config {
       logLevel: this.getEnv('LOG_LEVEL', 'info'),
       databaseUrl: this.getEnv('DATABASE_URL', 'postgresql://kadakaran:kadakaran@localhost:5432/kadakaran'),
       rabbitmqUrl: this.getEnv('RABBITMQ_URL', 'amqp://kadakaran:kadakaran@localhost:5672'),
+      serviceSharedSecret: this.getEnv('SERVICE_SHARED_SECRET', 'change-me'),
     };
 
     this.validate();
