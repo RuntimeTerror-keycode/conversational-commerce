@@ -59,7 +59,11 @@ export const AgentTurnRequest = z.object({
   // routing is never at the mercy of the model faithfully copying numbers.
   latitude: z.number().nullable().optional(),
   longitude: z.number().nullable().optional(),
-  media: InboundMedia.optional(),
+  // .nullable() matters here: the Python side sends an explicit JSON `null`
+  // for every non-image turn (pydantic's Optional[...] = None serializes as
+  // null, not an absent key), which a plain .optional() rejects outright —
+  // this broke every real text/voice/location message once media shipped.
+  media: InboundMedia.nullable().optional(),
 });
 
 export const AgentTurnResponse = z.object({
