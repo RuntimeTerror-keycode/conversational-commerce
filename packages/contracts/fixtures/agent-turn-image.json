@@ -1,0 +1,12 @@
+{
+  "traceId": "trc_demo_002",
+  "messageId": "wamid.demo002",
+  "customerRef": "919999999999",
+  "text": "",
+  "source": "image",
+  "locale": "mixed",
+  "media": {
+    "mimeType": "image/png",
+    "dataBase64": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAACklEQVR4nGNgAAACAAEABf4C/qe1wPMAAAAASUVORK5CYII="
+  }
+}

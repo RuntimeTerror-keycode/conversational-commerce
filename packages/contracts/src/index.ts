@@ -39,13 +39,20 @@ export const ReplyBlock = z.discriminatedUnion("type", [
   }),
 ]);
 
+/** Inbound media the edge has already downloaded. Base64 so no URL has to be served or expire. */
+export const InboundMedia = z.object({
+  mimeType: z.enum(["image/jpeg", "image/png", "image/webp"]),
+  dataBase64: z.string(),
+});
+
 export const AgentTurnRequest = z.object({
   traceId: z.string(),
   messageId: z.string(),
   customerRef: z.string(),
   text: z.string(),
-  source: z.enum(["text", "voice"]),
+  source: z.enum(["text", "voice", "image"]),
   locale: z.string().nullable().optional(),
+  media: InboundMedia.optional(),
 });
 
 export const AgentTurnResponse = z.object({
@@ -61,6 +68,7 @@ export const NotifyRequest = z.object({
   reason: z.enum(["order_accepted", "order_rejected", "out_for_delivery", "delivered", "substitution"]),
 });
 
+export type InboundMedia = z.infer<typeof InboundMedia>;
 export type ReplyBlock = z.infer<typeof ReplyBlock>;
 export type AgentTurnRequest = z.infer<typeof AgentTurnRequest>;
 export type AgentTurnResponse = z.infer<typeof AgentTurnResponse>;

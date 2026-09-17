@@ -6,6 +6,7 @@ import { mastra } from "../mastra/index.js";
 import { resolveRetailer } from "../mastra/tools/resolve-retailer.js";
 import { scopeFor } from "../mastra/memory/config.js";
 import { currentSession, isNewSession, rotateSession } from "../mastra/memory/session-store.js";
+import { extractList } from "../mastra/vision/extract-list.js";
 import type { ShoppingContextValues } from "../mastra/context.js";
 
 const MAX_BODY_LENGTH = 1024;
@@ -28,6 +29,21 @@ function collapseLeadingDuplicate(text: string): string {
     }
   }
   return text;
+}
+
+const NOT_READABLE =
+  "[The customer sent a photo. It could not be read as a shopping list. Say so briefly and ask them to type the items or send a clearer photo.]";
+
+function describeList(list: { items: { item: string; quantity: number | null; unit: string | null; legible: boolean }[] }): string {
+  const lines = list.items.map((entry) => {
+    const quantity = entry.quantity === null ? "" : ` ${entry.quantity}${entry.unit ? ` ${entry.unit}` : ""}`;
+    return `- ${entry.item}${quantity}${entry.legible ? "" : " (unclear handwriting)"}`;
+  });
+  return [
+    "[The customer sent a photo of a shopping list. These items were read from it:]",
+    ...lines,
+    "[Search for all of them with searchList, show what the shop has with prices, and ask them to confirm before adding anything to the cart. Ask about any item marked unclear.]",
+  ].join("\n");
 }
 
 function wasOrderPlaced(steps: Array<{ toolResults?: Array<{ payload: { toolName: string; result: unknown } }> }>): boolean {
@@ -64,7 +80,7 @@ export async function agentTurn(req: Request, res: Response) {
     return;
   }
 
-  const { traceId, customerRef, text, source } = parsed.data;
+  const { traceId, customerRef, text, source, media } = parsed.data;
 
   // docs/contracts.md §A1 documents a reserved `sessionHint` field for this, but it
   // isn't part of the actual AgentTurnRequest schema in packages/contracts yet, so
@@ -125,8 +141,26 @@ export async function agentTurn(req: Request, res: Response) {
     );
     requestContext.set("requireAddressFirst", source === "voice" && isFirstTurnOfSession && !hasAddress);
 
+    // The image is read here and discarded. Only the extracted text goes into
+    // the agent, so a base64 blob never enters the memory thread.
+    let prompt = text;
+    if (source === "image" && media) {
+      const list = await extractList(media);
+      console.log(
+        JSON.stringify({
+          traceId,
+          customerId,
+          event: "list_extracted",
+          readable: list.readable,
+          itemCount: list.items.length,
+          illegible: list.items.filter((entry) => !entry.legible).length,
+        }),
+      );
+      prompt = list.readable && list.items.length > 0 ? describeList(list) : NOT_READABLE;
+    }
+
     const shoppingAgent = mastra.getAgentById("shopping-agent");
-    const result = await shoppingAgent.generate(text, {
+    const result = await shoppingAgent.generate(prompt, {
       memory: scopeFor(customerId, sessionId),
       requestContext,
       // Mastra's default (5) is too low for a turn with several items —

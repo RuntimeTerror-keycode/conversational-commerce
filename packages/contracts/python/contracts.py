@@ -44,13 +44,19 @@ class CartSummaryBlock(BaseModel):
 
 ReplyBlock = Union[TextBlock, ButtonsBlock, ListBlock, CartSummaryBlock]
 
+class InboundMedia(BaseModel):
+    """Inbound media the edge has already downloaded, base64-encoded."""
+    mimeType: Literal["image/jpeg", "image/png", "image/webp"]
+    dataBase64: str
+
 class AgentTurnRequest(BaseModel):
     traceId: str
     messageId: str
     customerRef: str
     text: str
-    source: Literal["text", "voice"]
+    source: Literal["text", "voice", "image"]
     locale: Optional[str] = None
+    media: Optional[InboundMedia] = None
 
 class AgentTurnResponse(BaseModel):
     traceId: str
