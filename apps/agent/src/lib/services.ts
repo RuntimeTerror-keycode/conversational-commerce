@@ -58,6 +58,7 @@ function build(): Services {
     fulfillmentRepo,
     orderItemRepo,
     orderEventRepo,
+    shopProductRepo,
     db,
     logger,
   });

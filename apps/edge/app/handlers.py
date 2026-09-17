@@ -62,12 +62,22 @@ def render_reply_blocks(sender, blocks):
             )
 
 
-async def forward_to_agent(sender, text, message_id=None, source="text", locale=None):
+async def forward_to_agent(
+    sender,
+    text,
+    message_id=None,
+    source="text",
+    locale=None,
+    latitude=None,
+    longitude=None,
+):
     """Send one turn to apps/agent and render whatever it replies with.
 
     Shared by every message type (text, voice, location, interactive) so a
     customer's input is never silently swallowed by a static reply — it
-    always reaches the real conversational agent.
+    always reaches the real conversational agent. latitude/longitude are
+    only ever set for a genuine WhatsApp location share — never guessed
+    from text — so the agent can persist real coordinates deterministically.
     """
 
     settings = get_settings()
@@ -78,6 +88,8 @@ async def forward_to_agent(sender, text, message_id=None, source="text", locale=
         text=text,
         source=source,
         locale=locale,
+        latitude=latitude,
+        longitude=longitude,
     )
 
     try:
@@ -370,11 +382,14 @@ async def handle_location(
     save_address(sender, address)
 
     # Let the agent acknowledge the shared location in conversation, instead
-    # of a static "Location received!" reply that goes nowhere.
+    # of a static "Location received!" reply that goes nowhere. Real
+    # coordinates ride along so the agent can persist them deterministically.
     turn_result = await forward_to_agent(
         sender,
         f"[Shared delivery location] {address}",
         source="text",
+        latitude=latitude,
+        longitude=longitude,
     )
 
     return {**turn_result, "address": address, "latitude": latitude, "longitude": longitude}

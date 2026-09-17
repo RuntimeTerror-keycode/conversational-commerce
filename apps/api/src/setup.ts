@@ -144,6 +144,7 @@ export class Setup {
       fulfillmentRepo,
       orderItemRepo,
       orderEventRepo,
+      shopProductRepo,
       db,
       logger,
     });

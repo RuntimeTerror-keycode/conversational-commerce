@@ -52,6 +52,13 @@ export const AgentTurnRequest = z.object({
   text: z.string(),
   source: z.enum(["text", "voice", "image"]),
   locale: z.string().nullable().optional(),
+  // Set only when this turn came from a real WhatsApp location share (never
+  // from a customer-typed address or a pasted map link) — apps/edge already
+  // reverse-geocoded it before this request was made. The agent persists
+  // these deterministically in code, not via a model tool call, so shop
+  // routing is never at the mercy of the model faithfully copying numbers.
+  latitude: z.number().nullable().optional(),
+  longitude: z.number().nullable().optional(),
   media: InboundMedia.optional(),
 });
 

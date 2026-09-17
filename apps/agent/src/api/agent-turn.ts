@@ -3,6 +3,7 @@ import { AgentTurnRequest, type AgentTurnResponse } from "@cc/contracts";
 import { AppError } from "@cc/domain";
 import { RequestContext } from "@mastra/core/request-context";
 import { mastra } from "../mastra/index.js";
+import { getServices } from "../lib/services.js";
 import { resolveRetailer } from "../mastra/tools/resolve-retailer.js";
 import { scopeFor } from "../mastra/memory/config.js";
 import { currentSession, isNewSession, rotateSession } from "../mastra/memory/session-store.js";
@@ -15,19 +16,57 @@ function truncate(text: string, maxLength: number): string {
   return text.length > maxLength ? `${text.slice(0, maxLength - 1)}…` : text;
 }
 
+function normalizedWords(s: string): Set<string> {
+  return new Set(
+    s
+      .toLowerCase()
+      .replace(/[^\p{L}\p{N}\s]/gu, " ")
+      .split(/\s+/)
+      .filter((w) => w.length > 2),
+  );
+}
+
+function wordOverlapRatio(a: string, b: string): number {
+  const wa = normalizedWords(a);
+  const wb = normalizedWords(b);
+  if (wa.size === 0 || wb.size === 0) return 0;
+  let shared = 0;
+  for (const w of wa) if (wb.has(w)) shared++;
+  return shared / Math.min(wa.size, wb.size);
+}
+
 /**
- * Rare DeepSeek sampling glitch: the same sentence comes back twice in a row
- * with no separator ("Added milk.Added milk. Anything else?"). Not a
- * framework bug — result.text is genuinely the model's own final-step output
- * verbatim. Collapse the longest exact repeated prefix as a safety net so it
- * never reaches the customer looking broken.
+ * Rare DeepSeek sampling glitch: the model re-drafts its own reply mid-
+ * completion and both drafts leak into result.text, glued with no separator
+ * ("...GPay/UPI?Address saved ✅ (...). Total ₹670.\n\nCash on delivery...").
+ * Not a framework bug — result.text is genuinely the model's own final-step
+ * output verbatim, confirmed via direct instrumentation. Sometimes it's an
+ * exact repeat, sometimes reworded, so this can't just diff strings.
+ *
+ * A sentence-ending punctuation mark immediately followed by a capital
+ * letter, with zero whitespace, never happens in normal prose — it's the
+ * seam between drafts. Only treat it as a redraft (and keep the later,
+ * more complete draft) when the two sides also share substantial content;
+ * a stray missing space in otherwise normal text won't have that overlap,
+ * so it's left alone rather than risk truncating real information.
  */
-function collapseLeadingDuplicate(text: string): string {
-  for (let i = Math.floor(text.length / 2); i >= 20; i--) {
-    if (text.slice(0, i) === text.slice(i, 2 * i)) {
-      return text.slice(i);
+function collapseRedraftedReply(text: string): string {
+  const glueRegex = /[.?!)][A-Z]/g;
+  const splitPoints: number[] = [];
+  let match: RegExpExecArray | null;
+  while ((match = glueRegex.exec(text)) !== null) {
+    splitPoints.push(match.index + 1);
+  }
+
+  for (let i = splitPoints.length - 1; i >= 0; i--) {
+    const point = splitPoints[i];
+    const before = text.slice(0, point);
+    const after = text.slice(point);
+    if (after.length >= 20 && wordOverlapRatio(before, after) >= 0.4) {
+      return after;
     }
   }
+
   return text;
 }
 
@@ -80,7 +119,7 @@ export async function agentTurn(req: Request, res: Response) {
     return;
   }
 
-  const { traceId, customerRef, text, source, media } = parsed.data;
+  const { traceId, customerRef, text, source, latitude, longitude, media } = parsed.data;
 
   // docs/contracts.md §A1 documents a reserved `sessionHint` field for this, but it
   // isn't part of the actual AgentTurnRequest schema in packages/contracts yet, so
@@ -90,6 +129,26 @@ export async function agentTurn(req: Request, res: Response) {
   const isFirstTurnOfSession = isNewSession(customerId);
   const sessionId = currentSession(customerId);
   const startedAt = Date.now();
+
+  // A real WhatsApp location share carries real coordinates. Recorded here,
+  // deterministically, before shop resolution runs — not via a model tool
+  // call — so distance-based routing reflects where the customer actually
+  // is for this very turn, and can't be skipped or garbled by the model.
+  if (latitude != null && longitude != null) {
+    try {
+      const addressLine = text.replace(/^\[Shared delivery location\]\s*/, "");
+      await getServices().orders.recordSharedLocation(customerId, addressLine, latitude, longitude);
+    } catch (error) {
+      console.error(
+        JSON.stringify({
+          traceId,
+          customerId,
+          event: "record_shared_location_failed",
+          error: error instanceof Error ? error.message : String(error),
+        }),
+      );
+    }
+  }
 
   let resolved: Awaited<ReturnType<typeof resolveRetailer>>;
   try {
@@ -188,7 +247,7 @@ export async function agentTurn(req: Request, res: Response) {
     const response: AgentTurnResponse = {
       traceId,
       sessionState: orderPlaced ? "order_placed" : "active",
-      blocks: [{ type: "text", body: truncate(collapseLeadingDuplicate(result.text), MAX_BODY_LENGTH) }],
+      blocks: [{ type: "text", body: truncate(collapseRedraftedReply(result.text), MAX_BODY_LENGTH) }],
     };
 
     res.status(200).json(response);
