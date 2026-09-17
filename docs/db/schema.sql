@@ -134,9 +134,10 @@ CREATE TABLE cart (
 CREATE TABLE cart_item (
     id              SERIAL PRIMARY KEY,
     cart_id         INTEGER NOT NULL,
-    shop_product_id INTEGER NOT NULL,
+    catalog_id      INTEGER NOT NULL,
     quantity        INTEGER NOT NULL,
-    added_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    added_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE(cart_id, catalog_id)
 );
 
 -- ============================================================
@@ -144,21 +145,25 @@ CREATE TABLE cart_item (
 -- ============================================================
 
 CREATE TABLE master_order (
-    id              SERIAL PRIMARY KEY,
-    order_code      VARCHAR(20) NOT NULL UNIQUE,
-    customer_id     INTEGER NOT NULL,
-    address_id      INTEGER NOT NULL,
-    status          VARCHAR(50) NOT NULL DEFAULT 'placed',
-    payment_mode    VARCHAR(50) NOT NULL DEFAULT 'cod',
-    delivery_type   VARCHAR(50) NOT NULL DEFAULT 'delivery',
-    delivery_note   TEXT,
-    product_amount  DECIMAL(10,2) NOT NULL DEFAULT 0,
-    delivery_fee    DECIMAL(10,2) NOT NULL DEFAULT 0,
-    platform_fee    DECIMAL(10,2) NOT NULL DEFAULT 0,
-    total_amount    DECIMAL(10,2) NOT NULL DEFAULT 0,
-    trace_id        VARCHAR(100),
-    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at      TIMESTAMPTZ
+    id                  SERIAL PRIMARY KEY,
+    order_code          VARCHAR(20) NOT NULL UNIQUE,
+    customer_id         INTEGER NOT NULL,
+    address_id          INTEGER NOT NULL,
+    status              VARCHAR(50) NOT NULL DEFAULT 'placed',
+    payment_mode        VARCHAR(50) NOT NULL DEFAULT 'cod',
+    delivery_type       VARCHAR(50) NOT NULL DEFAULT 'delivery',
+    delivery_note       TEXT,
+    product_amount      DECIMAL(10,2) NOT NULL DEFAULT 0,
+    delivery_fee        DECIMAL(10,2) NOT NULL DEFAULT 0,
+    platform_fee        DECIMAL(10,2) NOT NULL DEFAULT 0,
+    total_amount        DECIMAL(10,2) NOT NULL DEFAULT 0,
+    confirmation_token  VARCHAR(100),
+    token_expires_at    TIMESTAMPTZ,
+    confirmed_snapshot  JSONB,
+    cart_hash           VARCHAR(64),
+    trace_id            VARCHAR(100),
+    created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at          TIMESTAMPTZ
 );
 
 CREATE TABLE fulfillment (

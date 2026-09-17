@@ -1,10 +1,12 @@
-import { AppError } from '../lib/app-error';
-import { Database } from '../lib/db';
+import {
+  AppError,
+  FulfillmentRepository,
+  OrderItemRepository,
+  OrderEventRepository,
+  ShopProductRepository,
+  IDatabase,
+} from '@cc/domain';
 import { Logger } from '../logger/logger';
-import { FulfillmentRepository } from '../repositories/fulfillment.repository';
-import { OrderItemRepository } from '../repositories/order-item.repository';
-import { OrderEventRepository } from '../repositories/order-event.repository';
-import { ShopProductRepository } from '../repositories/shop-product.repository';
 import {
   FulfillmentListResponse,
   FulfillmentDetail,
@@ -48,7 +50,7 @@ export class FulfillmentService {
   private readonly orderItemRepo: OrderItemRepository;
   private readonly orderEventRepo: OrderEventRepository;
   private readonly shopProductRepo: ShopProductRepository;
-  private readonly db: Database;
+  private readonly db: IDatabase;
   private readonly logger: Logger;
 
   constructor(
@@ -56,7 +58,7 @@ export class FulfillmentService {
     orderItemRepo: OrderItemRepository,
     orderEventRepo: OrderEventRepository,
     shopProductRepo: ShopProductRepository,
-    db: Database,
+    db: IDatabase,
     logger: Logger,
   ) {
     this.fulfillmentRepo = fulfillmentRepo;

@@ -1,4 +1,12 @@
-import { ErrorCode } from '../types';
+export type ErrorCode =
+  | 'bad_request'
+  | 'unauthorized'
+  | 'forbidden'
+  | 'not_found'
+  | 'conflict'
+  | 'validation_failed'
+  | 'rate_limited'
+  | 'internal_error';
 
 export class AppError extends Error {
   public readonly statusCode: number;

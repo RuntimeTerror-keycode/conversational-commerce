@@ -1,12 +1,11 @@
 import { Request, Response, NextFunction } from 'express';
-import { Database } from '../lib/db';
-import { AppError } from '../lib/app-error';
+import { AppError, IDatabase } from '@cc/domain';
 import { Logger } from '../logger/logger';
 
 export class ShopContextMiddleware {
-  private readonly db: Database;
+  private readonly db: IDatabase;
 
-  constructor(db: Database, _logger: Logger) {
+  constructor(db: IDatabase, _logger: Logger) {
     this.db = db;
   }
 

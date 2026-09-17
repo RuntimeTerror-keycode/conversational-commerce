@@ -3,21 +3,44 @@ import { Logger } from './logger/logger';
 import { Database } from './lib/db';
 import { MessageBroker } from './lib/rabbitmq';
 
-import { ShopUserRepository } from './repositories/shop-user.repository';
-import { FulfillmentRepository } from './repositories/fulfillment.repository';
-import { OrderItemRepository } from './repositories/order-item.repository';
-import { OrderEventRepository } from './repositories/order-event.repository';
-import { ShopProductRepository } from './repositories/shop-product.repository';
+// Repositories — all from domain
+import {
+  ShopUserRepository,
+  FulfillmentRepository,
+  OrderItemRepository,
+  OrderEventRepository,
+  ShopProductRepository,
+  CustomerRepository,
+  ShopRepository,
+  CatalogRepository,
+  CartRepository,
+  MasterOrderRepository,
+} from '@cc/domain';
 
+// Dashboard services — stay in apps/api
 import { IdentifyService } from './services/identify.service';
 import { FulfillmentService } from './services/fulfillment.service';
 import { InventoryService } from './services/inventory.service';
 
+// Domain services — from domain
+import {
+  RetailerResolveService,
+  CatalogSearchService,
+  CartService,
+  OrderPlacementService,
+} from '@cc/domain';
+
+// Controllers
 import { HealthController } from './controllers/health.controller';
 import { IdentifyController } from './controllers/identify.controller';
 import { FulfillmentController } from './controllers/fulfillment.controller';
 import { InventoryController } from './controllers/inventory.controller';
+import { RetailerController } from './controllers/retailer.controller';
+import { CatalogController } from './controllers/catalog.controller';
+import { CartController } from './controllers/cart.controller';
+import { OrderController } from './controllers/order.controller';
 
+// Middlewares
 import { RequestLogger } from './middlewares/request-logger.middleware';
 import { CorsMiddleware } from './middlewares/cors.middleware';
 import { ShopContextMiddleware } from './middlewares/shop-context.middleware';
@@ -29,6 +52,10 @@ export interface AppControllers {
   identify: IdentifyController;
   fulfillment: FulfillmentController;
   inventory: InventoryController;
+  retailer: RetailerController;
+  catalog: CatalogController;
+  cart: CartController;
+  order: OrderController;
 }
 
 export interface AppMiddlewares {
@@ -55,19 +82,42 @@ export class Setup {
     const db = new Database(config.values.databaseUrl, logger);
     const broker = new MessageBroker(config.values.rabbitmqUrl, logger);
 
-    // Repositories (one per table)
+    // Repositories (all from @cc/domain, take IDatabase)
     const shopUserRepo = new ShopUserRepository(db);
     const fulfillmentRepo = new FulfillmentRepository(db);
     const orderItemRepo = new OrderItemRepository(db);
     const orderEventRepo = new OrderEventRepository(db);
     const shopProductRepo = new ShopProductRepository(db);
+    const customerRepo = new CustomerRepository(db);
+    const shopRepo = new ShopRepository(db);
+    const catalogRepo = new CatalogRepository(db);
+    const cartRepo = new CartRepository(db);
+    const masterOrderRepo = new MasterOrderRepository(db);
 
-    // Services
+    // Dashboard services
     const identifyService = new IdentifyService(shopUserRepo, logger);
     const fulfillmentService = new FulfillmentService(
       fulfillmentRepo, orderItemRepo, orderEventRepo, shopProductRepo, db, logger,
     );
     const inventoryService = new InventoryService(shopProductRepo, logger);
+
+    // Agent-facing services (from @cc/domain, take ILogger)
+    const retailerService = new RetailerResolveService(customerRepo, shopRepo, logger);
+    const catalogService = new CatalogSearchService(catalogRepo, retailerService, logger);
+    const cartService = new CartService(
+      cartRepo, catalogRepo, customerRepo, shopProductRepo, retailerService, logger,
+    );
+    const orderPlacementService = new OrderPlacementService({
+      cartRepo,
+      customerRepo,
+      shopRepo,
+      masterOrderRepo,
+      fulfillmentRepo,
+      orderItemRepo,
+      orderEventRepo,
+      db,
+      logger,
+    });
 
     return {
       config,
@@ -79,6 +129,10 @@ export class Setup {
         identify: new IdentifyController(identifyService),
         fulfillment: new FulfillmentController(fulfillmentService),
         inventory: new InventoryController(inventoryService),
+        retailer: new RetailerController(retailerService),
+        catalog: new CatalogController(catalogService),
+        cart: new CartController(cartService),
+        order: new OrderController(orderPlacementService),
       },
       middlewares: {
         cors: new CorsMiddleware(),
