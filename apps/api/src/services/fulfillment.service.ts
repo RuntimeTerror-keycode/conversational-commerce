@@ -19,6 +19,7 @@ import {
   fulfillmentTimestampColumn,
   dashboardSettableStatuses,
 } from '../constants';
+import { NotifyService } from './notify.service';
 
 // ---------------------------------------------------------------------------
 // Params
@@ -51,6 +52,7 @@ export class FulfillmentService {
   private readonly orderEventRepo: OrderEventRepository;
   private readonly shopProductRepo: ShopProductRepository;
   private readonly db: IDatabase;
+  private readonly notifyService: NotifyService;
   private readonly logger: Logger;
 
   constructor(
@@ -59,6 +61,7 @@ export class FulfillmentService {
     orderEventRepo: OrderEventRepository,
     shopProductRepo: ShopProductRepository,
     db: IDatabase,
+    notifyService: NotifyService,
     logger: Logger,
   ) {
     this.fulfillmentRepo = fulfillmentRepo;
@@ -66,6 +69,7 @@ export class FulfillmentService {
     this.orderEventRepo = orderEventRepo;
     this.shopProductRepo = shopProductRepo;
     this.db = db;
+    this.notifyService = notifyService;
     this.logger = logger.child('FulfillmentService');
   }
 
@@ -198,7 +202,18 @@ export class FulfillmentService {
       fulfillmentId, shopId, from: current.status, to: targetStatus,
     });
 
-    return this.detail(fulfillmentId, shopId);
+    const detail = await this.detail(fulfillmentId, shopId);
+
+    if (targetStatus === 'out_for_delivery') {
+      await this.notifyService.send(
+        detail.customer.phone,
+        [{ type: 'text', body: `Your order ${detail.orderCode} is out for delivery!` }],
+        'out_for_delivery',
+        detail.traceId,
+      );
+    }
+
+    return detail;
   }
 
   public async updateItem(params: LineItemUpdate): Promise<FulfillmentDetail> {
@@ -217,6 +232,8 @@ export class FulfillmentService {
       throw AppError.notFound('Line item not found');
     }
 
+    let substitution: { oldName: string; newName: string } | null = null;
+
     if (remove) {
       await this.orderItemRepo.delete(lineId);
     } else if (substituteProductId) {
@@ -224,9 +241,12 @@ export class FulfillmentService {
       if (!product) {
         throw AppError.notFound('Substitute product not found in this shop');
       }
+      const existingItems = await this.orderItemRepo.findByFulfillment(fulfillmentId);
+      const oldName = existingItems.find((i) => i.lineId === lineId)?.productName ?? 'an item';
       const qty = await this.orderItemRepo.getQuantity(lineId);
       const newPrice = parseFloat(product.selling_price);
       await this.orderItemRepo.substitute(lineId, substituteProductId, newPrice, newPrice * qty);
+      substitution = { oldName, newName: product.local_name ?? 'a substitute item' };
     } else if (quantity !== undefined) {
       if (!Number.isInteger(quantity) || quantity < 1) {
         throw AppError.validation('quantity must be a positive integer');
@@ -241,6 +261,17 @@ export class FulfillmentService {
 
     this.logger.info('Line item updated', { fulfillmentId, lineId, shopId });
 
-    return this.detail(fulfillmentId, shopId);
+    const detail = await this.detail(fulfillmentId, shopId);
+
+    if (substitution) {
+      await this.notifyService.send(
+        detail.customer.phone,
+        [{ type: 'text', body: `We've substituted "${substitution.oldName}" with "${substitution.newName}" in your order ${detail.orderCode}.` }],
+        'substitution',
+        detail.traceId,
+      );
+    }
+
+    return detail;
   }
 }
