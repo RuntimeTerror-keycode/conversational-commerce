@@ -1,43 +1,12 @@
-import { Database } from '../lib/db';
-import { InventoryCounts } from '../types';
-
-// ---------------------------------------------------------------------------
-// Row types
-// ---------------------------------------------------------------------------
-
-export interface ShopProductRow {
-  id: number;
-  catalog_id: number;
-  local_name: string | null;
-  regular_price: string;
-  selling_price: string;
-  stock_quantity: number;
-  low_stock_threshold: number;
-  is_available: boolean;
-  updated_at: Date | null;
-}
-
-export interface ShopProductListRow extends ShopProductRow {
-  catalog_name: string;
-  brand: string | null;
-  unit: string | null;
-  sku: string | null;
-  category_name: string | null;
-}
-
-export interface CatalogRow {
-  name: string;
-  brand: string | null;
-  unit: string | null;
-  sku: string | null;
-  category_name: string | null;
-}
-
-export interface SubstituteProductRow {
-  id: number;
-  selling_price: string;
-  local_name: string;
-}
+import {
+  IDatabase,
+  ShopProductRow,
+  ShopProductListRow,
+  ShopCatalogRow,
+  SubstituteProductRow,
+  InventoryCounts,
+  ShopProductListParams,
+} from '../types';
 
 interface TotalRow {
   total: number;
@@ -47,27 +16,10 @@ interface IdRow {
   id: number;
 }
 
-// ---------------------------------------------------------------------------
-// Query params
-// ---------------------------------------------------------------------------
-
-export interface ShopProductListParams {
-  shopId: number;
-  q?: string;
-  category?: string;
-  stockState?: string;
-  limit: number;
-  offset: number;
-}
-
-// ---------------------------------------------------------------------------
-// Repository — primary table: shop_product
-// ---------------------------------------------------------------------------
-
 export class ShopProductRepository {
-  private readonly db: Database;
+  private readonly db: IDatabase;
 
-  constructor(db: Database) {
+  constructor(db: IDatabase) {
     this.db = db;
   }
 
@@ -153,8 +105,8 @@ export class ShopProductRepository {
     return result.rows[0];
   }
 
-  public async findCatalog(catalogId: number): Promise<CatalogRow> {
-    const result = await this.db.query<CatalogRow>(
+  public async findCatalog(catalogId: number): Promise<ShopCatalogRow> {
+    const result = await this.db.query<ShopCatalogRow>(
       `SELECT cat.name, cat.brand, cat.unit, cat.sku, cg.name AS category_name
        FROM catalog cat
        LEFT JOIN category cg ON cg.id = cat.category_id
@@ -162,6 +114,39 @@ export class ShopProductRepository {
       [catalogId],
     );
     return result.rows[0];
+  }
+
+  public async cheapestPrices(
+    catalogIds: number[],
+    shopIds: number[],
+  ): Promise<{ catalog_id: number; price: number }[]> {
+    if (catalogIds.length === 0 || shopIds.length === 0) return [];
+    const result = await this.db.query<{ catalog_id: number; price: number }>(
+      `SELECT catalog_id, MIN(selling_price)::float AS price
+       FROM shop_product
+       WHERE catalog_id = ANY($1::int[])
+         AND shop_id = ANY($2::int[])
+         AND is_available = true
+         AND stock_quantity > 0
+       GROUP BY catalog_id`,
+      [catalogIds, shopIds],
+    );
+    return result.rows;
+  }
+
+  public async findByCatalogAndShop(
+    catalogId: number,
+    shopId: number,
+  ): Promise<{ id: number; selling_price: string; is_available: boolean; stock_quantity: number } | null> {
+    const result = await this.db.query<{
+      id: number; selling_price: string; is_available: boolean; stock_quantity: number;
+    }>(
+      `SELECT id, selling_price, is_available, stock_quantity
+       FROM shop_product
+       WHERE catalog_id = $1 AND shop_id = $2`,
+      [catalogId, shopId],
+    );
+    return result.rows[0] ?? null;
   }
 
   private buildWhereClause(shopId: number, q?: string, category?: string, stockState?: string) {

@@ -12,7 +12,7 @@ customer (phone is UNIQUE — same as WhatsApp number)
 │   └── address       (address_id → address.id)
 ├── cart              (customer_id → customer.id)
 │   └── cart_item     (cart_id → cart.id)
-│       └── shop_product  (shop_product_id → shop_product.id)
+│       └── catalog   (catalog_id → catalog.id)
 ├── master_order      (customer_id → customer.id)
 │   ├── address       (address_id → address.id)
 │   ├── fulfillment   (master_order_id → master_order.id)
@@ -58,7 +58,7 @@ category
 | **offer** | `shop_product_id` | `shop_product.id` | many → one |
 | **cart** | `customer_id` | `customer.id` | many → one |
 | **cart_item** | `cart_id` | `cart.id` | many → one |
-| **cart_item** | `shop_product_id` | `shop_product.id` | many → one |
+| **cart_item** | `catalog_id` | `catalog.id` | many → one |
 | **master_order** | `customer_id` | `customer.id` | many → one |
 | **master_order** | `address_id` | `address.id` | many → one |
 | **fulfillment** | `master_order_id` | `master_order.id` | many → one |
@@ -101,9 +101,9 @@ tag → catalog (catalog_id) → shop_product (catalog_id) → shop (shop_id)
                                                         → shop_address → address (lat/lng)
 ```
 
-**Agent — build cart:**
+**Agent — build cart (catalog-level, shop assigned at order time):**
 ```
-cart → cart_item → shop_product (specific shop's price + stock)
+cart → cart_item → catalog (catalog_id)
 ```
 
 ## Money
@@ -112,8 +112,8 @@ All monetary values are `DECIMAL(10,2)` in **rupees with paisa** (e.g., `320.00`
 
 ## Status values
 
-**master_order.status:** `placed` | `accepted` | `in_progress` | `delivered` | `partially_delivered`
-(derived from fulfillment statuses, updated by application code)
+**master_order.status:** `draft` | `placed` | `accepted` | `in_progress` | `delivered` | `partially_delivered`
+(`draft` = awaiting customer confirmation via token; `placed` = confirmed and fulfillments created)
 
 **fulfillment.status:** `accepted` → `packed` → `out_for_delivery` → `delivered`
 (also `rejected` as a terminal state; transitions enforced in application code)

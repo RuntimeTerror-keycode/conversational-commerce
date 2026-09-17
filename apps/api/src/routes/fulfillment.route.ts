@@ -7,14 +7,13 @@ export class FulfillmentRoute {
 
   constructor(controller: FulfillmentController, shopContext: ShopContextMiddleware) {
     this.router = Router();
-    this.router.use(shopContext.handle);
-    this.initializeRoutes(controller);
+    this.initializeRoutes(controller, shopContext);
   }
 
-  private initializeRoutes(controller: FulfillmentController): void {
-    this.router.get('/fulfillments', controller.list);
-    this.router.get('/fulfillments/:id', controller.detail);
-    this.router.patch('/fulfillments/:id', controller.updateStatus);
-    this.router.patch('/fulfillments/:id/items/:lineId', controller.updateItem);
+  private initializeRoutes(controller: FulfillmentController, shopContext: ShopContextMiddleware): void {
+    this.router.get('/fulfillments', shopContext.handle, controller.list);
+    this.router.get('/fulfillments/:id', shopContext.handle, controller.detail);
+    this.router.patch('/fulfillments/:id', shopContext.handle, controller.updateStatus);
+    this.router.patch('/fulfillments/:id/items/:lineId', shopContext.handle, controller.updateItem);
   }
 }
