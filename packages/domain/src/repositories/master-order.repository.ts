@@ -111,6 +111,46 @@ export class MasterOrderRepository {
     );
   }
 
+  /**
+   * Attaches checkout-confirmation fields to an already-open session draft
+   * (see findOpenSessionDraft) instead of inserting a second master_order row
+   * for the same customer. Keeps the order_code assigned when the session
+   * started.
+   */
+  public async attachConfirmation(
+    orderId: number,
+    input: Omit<MasterOrderInsert, 'orderCode' | 'customerId'>,
+  ): Promise<MasterOrderRow> {
+    const result = await this.db.query<MasterOrderRow>(
+      `UPDATE master_order SET
+        address_id = $2,
+        product_amount = $3,
+        total_amount = $4,
+        confirmation_token = $5,
+        token_expires_at = $6,
+        confirmed_snapshot = $7,
+        cart_hash = $8,
+        delivery_note = $9,
+        trace_id = $10,
+        updated_at = NOW()
+      WHERE id = $1
+      RETURNING *`,
+      [
+        orderId,
+        input.addressId,
+        input.productAmount,
+        input.totalAmount,
+        input.confirmationToken,
+        input.tokenExpiresAt,
+        JSON.stringify(input.confirmedSnapshot),
+        input.cartHash,
+        input.deliveryNote ?? null,
+        input.traceId ?? null,
+      ],
+    );
+    return result.rows[0];
+  }
+
   public async findById(orderId: number): Promise<MasterOrderRow | null> {
     const result = await this.db.query<MasterOrderRow>(
       `SELECT * FROM master_order WHERE id = $1`,
