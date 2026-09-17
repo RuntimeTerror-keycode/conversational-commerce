@@ -41,11 +41,18 @@ export class OrderNotifyService {
       return;
     }
 
-    await this.notifyService.send(
-      customer.phone,
-      [{ type: 'text', body: `Your order ${order.order_code} has been accepted! ETA ~${etaMinutes} minutes.` }],
-      'order_accepted',
-      order.trace_id,
-    );
+    const shopNames = order.confirmed_snapshot?.assignments?.map((a) => a.shopName) ?? [];
+    const shopClause = shopNames.length > 0 ? ` by *${shopNames.join(' & ')}*` : '';
+
+    const body = [
+      '✅ *Order Confirmed!*',
+      `Your order \`${order.order_code}\` has been accepted${shopClause} and is being prepared.`,
+      '',
+      `⏱️ Estimated delivery: *~${etaMinutes} minutes*`,
+      '',
+      'Thanks for shopping with us! 🛒',
+    ].join('\n');
+
+    await this.notifyService.send(customer.phone, [{ type: 'text', body }], 'order_accepted', order.trace_id);
   }
 }
