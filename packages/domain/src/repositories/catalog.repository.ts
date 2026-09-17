@@ -1,3 +1,4 @@
+import { PoolClient } from 'pg';
 import { IDatabase, CatalogSearchRow, CatalogItemRow, SubstituteRow } from '../types';
 
 export class CatalogRepository {
@@ -122,6 +123,39 @@ export class CatalogRepository {
       [catalogId],
     );
     return result.rows[0] ?? null;
+  }
+
+  /** Find a catalog entry by name + brand (case-insensitive, brand null-safe). */
+  public async findByNameAndBrandTx(
+    client: PoolClient,
+    name: string,
+    brand: string | null,
+  ): Promise<number | null> {
+    const result = await client.query<{ id: number }>(
+      `SELECT id FROM catalog
+       WHERE LOWER(name) = LOWER($1)
+         AND (brand IS NOT DISTINCT FROM $2)
+       LIMIT 1`,
+      [name, brand],
+    );
+    return result.rows[0]?.id ?? null;
+  }
+
+  /** Insert a new catalog entry and return its id. */
+  public async insertTx(
+    client: PoolClient,
+    name: string,
+    brand: string | null,
+    categoryId: number,
+    unit: string | null,
+    sku: string | null,
+  ): Promise<number> {
+    const result = await client.query<{ id: number }>(
+      `INSERT INTO catalog (name, brand, category_id, unit, sku)
+       VALUES ($1, $2, $3, $4, $5) RETURNING id`,
+      [name, brand, categoryId, unit, sku],
+    );
+    return result.rows[0].id;
   }
 
   public async exists(catalogId: number): Promise<boolean> {
