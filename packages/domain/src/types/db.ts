@@ -9,6 +9,7 @@ export interface CustomerRow {
   phone: string;
   display_name: string | null;
   language: string | null;
+  default_payment_mode: string | null;
 }
 
 export interface CustomerWithAddressRow extends CustomerRow {
@@ -115,6 +116,7 @@ export interface MasterOrderInsert {
   orderCode: string;
   customerId: number;
   addressId: number;
+  paymentMode: string;
   productAmount: number;
   totalAmount: number;
   confirmationToken: string;

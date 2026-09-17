@@ -4,6 +4,8 @@ import { getCart } from "./get-cart.js";
 import { updateCart } from "./update-cart.js";
 import { requestOrderConfirmation } from "./request-confirmation.js";
 import { placeOrder } from "./place-order.js";
+import { setDeliveryAddress } from "./set-delivery-address.js";
+import { setPaymentMode } from "./set-payment-mode.js";
 
 export const shoppingTools = {
   searchProducts,
@@ -12,4 +14,6 @@ export const shoppingTools = {
   updateCart,
   requestOrderConfirmation,
   placeOrder,
+  setDeliveryAddress,
+  setPaymentMode,
 };

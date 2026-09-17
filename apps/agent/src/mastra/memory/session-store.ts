@@ -17,6 +17,11 @@ export function currentSession(customerId: string): string {
   return sessionId;
 }
 
+/** True if this turn is about to start a session that didn't exist a moment ago. Call before currentSession(). */
+export function isNewSession(customerId: string): boolean {
+  return !sessions.has(customerId);
+}
+
 /** Called once an order is placed, so the next turn starts a fresh thread. */
 export function rotateSession(customerId: string): string {
   const sessionId = newSessionId(customerId);

@@ -71,7 +71,7 @@ export class WhatsappService {
           customerRef: req.customerRef,
           orderId: session.orderId,
           tag: 'not_found',
-          body: `Sorry, we couldn't find that at ${primary.name}.`,
+          body: `Sorry, we couldn't find that at the store.`,
         };
       case 'single':
         return { customerRef: req.customerRef, orderId: session.orderId, tag: 'found', rows: [toRow(match.item)] };
@@ -100,7 +100,7 @@ export class WhatsappService {
         customerRef: req.customerRef,
         orderId: req.orderId,
         tag: 'unavailable',
-        body: `That item just went out of stock at ${primary.name}.`,
+        body: `That item just went out of stock at the store.`,
         substitutes: availability.substitutes.map((s) => ({
           id: Number(s.id),
           name: s.name,

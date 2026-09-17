@@ -4,7 +4,6 @@ import {
   OrderItemRepository,
   OrderEventRepository,
   ShopProductRepository,
-  ShopRepository,
   IDatabase,
 } from '@cc/domain';
 import { Logger } from '../logger/logger';
@@ -52,7 +51,6 @@ export class FulfillmentService {
   private readonly orderItemRepo: OrderItemRepository;
   private readonly orderEventRepo: OrderEventRepository;
   private readonly shopProductRepo: ShopProductRepository;
-  private readonly shopRepo: ShopRepository;
   private readonly db: IDatabase;
   private readonly notifyService: NotifyService;
   private readonly logger: Logger;
@@ -62,7 +60,6 @@ export class FulfillmentService {
     orderItemRepo: OrderItemRepository,
     orderEventRepo: OrderEventRepository,
     shopProductRepo: ShopProductRepository,
-    shopRepo: ShopRepository,
     db: IDatabase,
     notifyService: NotifyService,
     logger: Logger,
@@ -71,7 +68,6 @@ export class FulfillmentService {
     this.orderItemRepo = orderItemRepo;
     this.orderEventRepo = orderEventRepo;
     this.shopProductRepo = shopProductRepo;
-    this.shopRepo = shopRepo;
     this.db = db;
     this.notifyService = notifyService;
     this.logger = logger.child('FulfillmentService');
@@ -214,11 +210,9 @@ export class FulfillmentService {
     const detail = await this.detail(fulfillmentId, shopId);
 
     if (targetStatus === 'out_for_delivery') {
-      const shop = await this.shopRepo.findById(shopId);
-      const shopName = shop?.name ?? 'the shop';
       const body = [
         '🚚 *Out for Delivery!*',
-        `Your order \`${detail.orderCode}\` from *${shopName}* is on its way!`,
+        `Your order \`${detail.orderCode}\` is on its way!`,
         '',
         `📍 Delivering to: ${detail.delivery.address ?? 'your address'}`,
         '',
@@ -229,11 +223,9 @@ export class FulfillmentService {
     }
 
     if (targetStatus === 'delivered') {
-      const shop = await this.shopRepo.findById(shopId);
-      const shopName = shop?.name ?? 'the shop';
       const body = [
         '📦 *Delivered!*',
-        `Your order \`${detail.orderCode}\` from *${shopName}* has been delivered.`,
+        `Your order \`${detail.orderCode}\` has been delivered.`,
         '',
         'Thanks for shopping with us — enjoy! 🛍️',
       ].join('\n');
@@ -301,11 +293,9 @@ export class FulfillmentService {
     const detail = await this.detail(fulfillmentId, shopId);
 
     if (substitution) {
-      const shop = await this.shopRepo.findById(shopId);
-      const shopName = shop?.name ?? 'the shop';
       const body = [
         '🔄 *Item Substituted*',
-        `In your order \`${detail.orderCode}\` from *${shopName}*:`,
+        `In your order \`${detail.orderCode}\`:`,
         '',
         `~${substitution.oldName}~ → *${substitution.newName}*`,
         '',

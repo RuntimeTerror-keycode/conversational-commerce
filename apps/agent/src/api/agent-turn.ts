@@ -4,7 +4,7 @@ import { RequestContext } from "@mastra/core/request-context";
 import { mastra } from "../mastra/index.js";
 import { resolveRetailer } from "../mastra/tools/resolve-retailer.js";
 import { scopeFor } from "../mastra/memory/config.js";
-import { currentSession, rotateSession } from "../mastra/memory/session-store.js";
+import { currentSession, isNewSession, rotateSession } from "../mastra/memory/session-store.js";
 import type { ShoppingContextValues } from "../mastra/context.js";
 
 const MAX_BODY_LENGTH = 1024;
@@ -28,18 +28,19 @@ export async function agentTurn(req: Request, res: Response) {
     return;
   }
 
-  const { traceId, customerRef, text } = parsed.data;
+  const { traceId, customerRef, text, source } = parsed.data;
 
   // docs/contracts.md §A1 documents a reserved `sessionHint` field for this, but it
   // isn't part of the actual AgentTurnRequest schema in packages/contracts yet, so
   // sessions are tracked agent-side for now. Only the order-placed boundary rotates
   // the thread — the 30-min idle boundary still needs sessionHint or edge tracking.
   const customerId = customerRef;
+  const isFirstTurnOfSession = isNewSession(customerId);
   const sessionId = currentSession(customerId);
   const startedAt = Date.now();
 
   try {
-    const { primary, nearby } = await resolveRetailer(customerRef);
+    const { primary, nearby, hasAddress } = await resolveRetailer(customerRef);
 
     const requestContext = new RequestContext<ShoppingContextValues>();
     requestContext.set("retailerId", primary.retailerId);
@@ -50,6 +51,7 @@ export async function agentTurn(req: Request, res: Response) {
       "nearbyShopIds",
       nearby.map((shop) => shop.retailerId),
     );
+    requestContext.set("requireAddressFirst", source === "voice" && isFirstTurnOfSession && !hasAddress);
 
     const shoppingAgent = mastra.getAgentById("shopping-agent");
     const result = await shoppingAgent.generate(text, {

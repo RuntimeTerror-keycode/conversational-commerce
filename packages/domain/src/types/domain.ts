@@ -11,6 +11,7 @@ export interface NearbyShop {
 export interface ResolveRetailerResponse {
   primary: { retailerId: string; name: string; area: string };
   nearby: NearbyShop[];
+  hasAddress: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -87,6 +88,7 @@ export interface OrderConfirmationResponse {
   expiresAt: string;
   shopBreakdown: ShopBreakdownEntry[];
   deliveryAddress: string | null;
+  paymentMode: string | null;
 }
 
 // ---------------------------------------------------------------------------

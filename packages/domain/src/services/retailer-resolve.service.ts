@@ -49,6 +49,7 @@ export class RetailerResolveService {
         area: primaryShop.city ?? 'Unknown',
       },
       nearby,
+      hasAddress: customer.address_id !== null,
     };
   }
 

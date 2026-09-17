@@ -41,12 +41,9 @@ export class OrderNotifyService {
       return;
     }
 
-    const shopNames = order.confirmed_snapshot?.assignments?.map((a) => a.shopName) ?? [];
-    const shopClause = shopNames.length > 0 ? ` by *${shopNames.join(' & ')}*` : '';
-
     const body = [
       '✅ *Order Confirmed!*',
-      `Your order \`${order.order_code}\` has been accepted${shopClause} and is being prepared.`,
+      `Your order \`${order.order_code}\` has been accepted and is being prepared.`,
       '',
       `⏱️ Estimated delivery: *~${etaMinutes} minutes*`,
       '',
