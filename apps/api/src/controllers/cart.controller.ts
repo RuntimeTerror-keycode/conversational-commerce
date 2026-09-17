@@ -1,14 +1,12 @@
 import { Request, Response } from 'express';
 
-import { CartService, RetailerResolveService } from '@cc/domain';
+import { CartOrchestrationService } from '../services/cart-orchestration.service';
 
 export class CartController {
-  private readonly service: CartService;
-  private readonly retailerService: RetailerResolveService;
+  private readonly service: CartOrchestrationService;
 
-  constructor(service: CartService, retailerService: RetailerResolveService) {
+  constructor(service: CartOrchestrationService) {
     this.service = service;
-    this.retailerService = retailerService;
   }
 
   /** GET /api/cart/:customerId */
@@ -18,8 +16,7 @@ export class CartController {
       res.status(400).json({ status: 'error', code: 'bad_request', message: 'customerId is required' });
       return;
     }
-    const { primary } = await this.retailerService.resolve(customerId);
-    const result = await this.service.getCart(primary.retailerId, customerId);
+    const result = await this.service.getCartByCustomer(customerId);
     res.status(200).json(result);
   };
 
@@ -37,8 +34,7 @@ export class CartController {
       res.status(400).json({ status: 'error', code: 'bad_request', message: 'op with action and productId is required' });
       return;
     }
-    const { primary } = await this.retailerService.resolve(customerId);
-    const result = await this.service.mutateCart(primary.retailerId, customerId, {
+    const result = await this.service.mutateCartByCustomer(customerId, {
       action: op.action as 'add' | 'remove' | 'set',
       productId: op.productId,
       quantity: op.quantity ?? 1,

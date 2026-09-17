@@ -1,14 +1,12 @@
 import { Request, Response } from 'express';
 
-import { CatalogSearchService, RetailerResolveService } from '@cc/domain';
+import { CatalogOrchestrationService } from '../services/catalog-orchestration.service';
 
 export class CatalogController {
-  private readonly service: CatalogSearchService;
-  private readonly retailerService: RetailerResolveService;
+  private readonly service: CatalogOrchestrationService;
 
-  constructor(service: CatalogSearchService, retailerService: RetailerResolveService) {
+  constructor(service: CatalogOrchestrationService) {
     this.service = service;
-    this.retailerService = retailerService;
   }
 
   /** GET /api/catalog/search?customerId=...&query=...&limit=... */
@@ -25,8 +23,7 @@ export class CatalogController {
       return;
     }
     const opts = limitStr ? { limit: parseInt(limitStr, 10) } : undefined;
-    const { primary } = await this.retailerService.resolve(customerId);
-    const result = await this.service.searchProducts(primary.retailerId, query, opts);
+    const result = await this.service.searchByCustomer(customerId, query, opts);
     res.status(200).json(result);
   };
 

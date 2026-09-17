@@ -32,8 +32,10 @@ import {
   SessionService,
 } from '@cc/domain';
 
-// WhatsApp orchestration — stays in apps/api (schema/routing only, calls @cc/domain)
+// Orchestration — stays in apps/api (schema/routing only, calls @cc/domain)
 import { WhatsappService } from './services/whatsapp.service';
+import { CatalogOrchestrationService } from './services/catalog-orchestration.service';
+import { CartOrchestrationService } from './services/cart-orchestration.service';
 
 // Controllers
 import { HealthController } from './controllers/health.controller';
@@ -135,6 +137,10 @@ export class Setup {
       sessionService, retailerService, catalogService, cartService, logger,
     );
 
+    // Customer-facing catalog/cart orchestration (resolves retailerId from customerId)
+    const catalogOrchestrationService = new CatalogOrchestrationService(catalogService, retailerService);
+    const cartOrchestrationService = new CartOrchestrationService(cartService, retailerService);
+
     return {
       config,
       logger,
@@ -146,8 +152,8 @@ export class Setup {
         fulfillment: new FulfillmentController(fulfillmentService),
         inventory: new InventoryController(inventoryService),
         retailer: new RetailerController(retailerService),
-        catalog: new CatalogController(catalogService, retailerService),
-        cart: new CartController(cartService, retailerService),
+        catalog: new CatalogController(catalogOrchestrationService),
+        cart: new CartController(cartOrchestrationService),
         order: new OrderController(orderPlacementService),
         whatsapp: new WhatsappController(whatsappService),
       },
