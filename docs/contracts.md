@@ -86,8 +86,8 @@ These live in `src/domain/` and are shared with the dashboard routes. Signatures
 ```ts
 searchProducts(retailerId: string, query: string, opts?): Promise<Product[]>
 checkAvailability(retailerId: string, productIds: string[]): Promise<AvailabilityResult[]>
-getCart(customerId: string, retailerId: string): Promise<Cart>
-mutateCart(customerId: string, retailerId: string, op: CartOp): Promise<Cart>  // returns FULL cart
+getCart(retailerId: string, customerId: string): Promise<Cart>
+mutateCart(retailerId: string, customerId: string, op: CartOp): Promise<Cart>  // returns FULL cart
 createOrder(cartId: string, opts): Promise<Order>
 transitionOrder(orderId: string, to: OrderStatus): Promise<Order>  // emits notify
 resolveRetailer(customerRef: string): Promise<{ retailerId: string; name: string; area: string }>
@@ -300,7 +300,7 @@ The FE dev's analysis (`docs/frontend-contract.md`) proposed designs and raised 
 | 409 with `details.order` on conflict | **Accepted.** |
 | Q-X1 (money: paise or rupees) | **Decimal rupees** — `DECIMAL(10,2)` in the DB. `320.00` = ₹320. |
 | Q-X2 (list envelope) | **Yes** — see above. |
-| Q-X3 (who owns `/notify`) | **`apps/api`** — it owns order mutation and status transitions. |
+| Q-X3 (who owns `/notify`) | **`apps/api`** — it owns order mutation and status transitions. **Implemented 2026-09-17**, see changelog below. |
 | Q-X5 (shared types in `packages/contracts`?) | **Yes.** Dashboard types go in `packages/contracts`. Python mirror only for types the edge needs. |
 | Q-X6 (deploy origin) | **Localhost for hackathon.** CORS allows `http://localhost:*`. |
 
@@ -328,3 +328,40 @@ The FE dev's analysis (`docs/frontend-contract.md`) proposed designs and raised 
 | Q-S2 (shop open/closed toggle) | Not for hackathon. Crosses into agent behaviour. |
 | Q-S3 (opening hours) | DB has `shop.opening_time` / `closing_time`. No enforcement yet. |
 | Q-U1–U5 | FE's choice. No BE dependency. |
+
+---
+
+## 2026-09-17 — `/notify` outbound call implemented (Q-X3, spec.md §14 item 1)
+
+`apps/api` now actually calls `POST {EDGE_BASE_URL}/notify` (previously: decided but never
+built, on any branch — the DB got updated and the loop stopped there). Three call sites:
+
+- `OrderController.place` → `reason: order_accepted`, right after `createOrder` succeeds
+  (fulfillments default to `status='accepted'`, so there's no separate dashboard "accept"
+  action to hang this off of — see `apps/api/src/services/order-notify.service.ts`).
+- `FulfillmentService.updateStatus` → `reason: out_for_delivery`, on that one transition only
+  (`packed`/`delivered` don't map to a `NotifyRequest` reason).
+- `FulfillmentService.updateItem` → `reason: substitution`, on the `substituteProductId` branch.
+
+`order_rejected` is defined in the reason type but has no caller — `rejected` still isn't
+dashboard-settable (spec.md §14 item 3, unresolved). Auth reuses the existing
+`SERVICE_SHARED_SECRET`/`X-Service-Token` pattern edge already validates on this endpoint.
+Failures are logged and swallowed, never fail the retailer's underlying action. Verified live
+against a running `apps/edge` (stub Meta send, no real WhatsApp creds) for all three reasons,
+plus a resilience check with edge killed mid-request.
+
+---
+
+## 2026-09-17 — WhatsApp search/select ships api-direct, agent bypassed for now
+
+Provisional answer to open question 13 in root `spec.md` §14 ("Reconcile WhatsApp
+`found`/`choice` tags with `ReplyBlock`"): `apps/agent` isn't built yet, so `apps/edge`
+calls two new synchronous `apps/api` endpoints directly — `POST /api/whatsapp/orders/search`
+and `POST /api/whatsapp/orders/select` (full shapes in `apps/Whatsapp contract.md`), auth'd
+with the same `X-Service-Token` pattern as `POST /notify` above. This is **not** a
+replacement for the `/agent/turn` → `ReplyBlock` → edge-adapter design described in §A/§D
+above — it's what unblocks the demo before `apps/agent` exists. When `apps/agent` ships,
+the `packages/domain` calls these endpoints make (`CatalogSearchService`, `CartService`,
+`SessionService`) should move behind Mastra tools, and the `found`/`choice`/`not_found`/
+`added`/`unavailable` tags should be reconciled with `ReplyBlock` in the edge adapter as
+originally planned. See root `spec.md` §14 item 14 for the full note.

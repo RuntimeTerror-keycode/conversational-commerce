@@ -1,5 +1,17 @@
 import { FulfillmentStatus } from '../types';
 
+// Re-export domain constants
+export {
+  defaultSearchLimit,
+  maxSearchLimit,
+  confirmationTokenTtlMinutes,
+  defaultEtaMinutes,
+  minFulfillmentAmount,
+  cartActions,
+  masterOrderStatuses,
+} from '@cc/domain';
+export type { CartAction, MasterOrderStatus } from '@cc/domain';
+
 // ---------------------------------------------------------------------------
 // Fulfillment statuses
 // ---------------------------------------------------------------------------
@@ -8,24 +20,38 @@ export const fulfillmentStatuses: FulfillmentStatus[] = [
   'accepted', 'packed', 'out_for_delivery', 'delivered', 'rejected',
 ];
 
-/** Map from current status → the only valid next status. */
 export const fulfillmentTransitions: Partial<Record<FulfillmentStatus, FulfillmentStatus>> = {
   accepted: 'packed',
   packed: 'out_for_delivery',
   out_for_delivery: 'delivered',
 };
 
-/** Which timestamp column to set when a fulfillment reaches a given status. */
 export const fulfillmentTimestampColumn: Record<string, string> = {
   packed: 'packed_at',
   out_for_delivery: 'out_for_delivery_at',
   delivered: 'delivered_at',
 };
 
-/** Statuses the dashboard is allowed to set via PATCH. */
 export const dashboardSettableStatuses: FulfillmentStatus[] = [
   'packed', 'out_for_delivery', 'delivered',
 ];
+
+// ---------------------------------------------------------------------------
+// Inventory ownership
+//
+// `managed` — the shopkeeper keeps stock and prices here, and we decrement
+//             counts as orders are fulfilled.
+// `synced`  — the shop runs its own POS/billing system and pushes a full
+//             snapshot to us. Our rows are a copy, so the portal is read-only:
+//             a write here would be overwritten by the next push, and would
+//             disagree with the shop's real stock until then.
+// ---------------------------------------------------------------------------
+
+export const inventoryModes = ['managed', 'synced'] as const;
+export type InventoryMode = typeof inventoryModes[number];
+
+/** The one place that decides whether a shop's stock is ours to write. */
+export const isManagedInventory = (mode: string): boolean => mode === 'managed';
 
 // ---------------------------------------------------------------------------
 // Inventory stock state filters
@@ -33,6 +59,14 @@ export const dashboardSettableStatuses: FulfillmentStatus[] = [
 
 export const stockStateFilters = ['in_stock', 'low', 'out'] as const;
 export type StockStateFilter = typeof stockStateFilters[number];
+
+// ---------------------------------------------------------------------------
+// Inventory sync — external software integrations
+// ---------------------------------------------------------------------------
+
+export const inventorySoftwareNames = ['freshkart', 'storelink'] as const;
+export type InventorySoftwareName = typeof inventorySoftwareNames[number];
+export const inventorySyncQueue = 'inventory.sync';
 
 // ---------------------------------------------------------------------------
 // Pagination defaults

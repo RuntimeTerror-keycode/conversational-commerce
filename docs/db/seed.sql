@@ -239,7 +239,7 @@ SELECT setval('address_id_seq', 6);
 INSERT INTO shop (id, name, owner_name, phone, opening_time, closing_time, is_active, delivery_radius_km, inventory_mode) VALUES
     (1, 'Krishna Supermart',  'Suresh Kumar',  '919847100001', '07:00', '22:00', true, 5.0,  'managed'),
     (2, 'Maveli Stores',      'Anil Menon',    '919847100002', '08:00', '21:00', true, 4.0,  'managed'),
-    (3, 'Lakshmi Grocery',    'Geetha Nair',   '919847100003', '06:30', '21:30', true, 3.5,  'managed');
+    (3, 'Lakshmi Grocery',    'Geetha Nair',   '919847100003', '06:30', '21:30', true, 3.5,  'synced');
 
 SELECT setval('shop_id_seq', 3);
 
@@ -425,3 +425,109 @@ INSERT INTO shop_user (id, shop_id, username, name, phone, role) VALUES
     (3, 3, 'geetha',  'Geetha Nair',   '919847100003', 'owner');
 
 SELECT setval('shop_user_id_seq', 3);
+
+-- ---------------------------------------------------------------------------
+-- Demo orders
+--
+-- Follows docs/contracts.md §C2: a fulfillment is born `accepted` (the system
+-- auto-accepts), and the shopkeeper advances it accepted -> packed ->
+-- out_for_delivery -> delivered. `rejected` is kept defensively — one row
+-- exists so the UI branch is reachable, though nothing in the product
+-- produces that state.
+--
+-- Every stage is represented so the dashboard, the work queue and the history
+-- screen all have something to show without waiting on the agent.
+-- ---------------------------------------------------------------------------
+
+INSERT INTO master_order
+  (order_code, customer_id, address_id, status, payment_mode, delivery_type,
+   delivery_note, product_amount, delivery_fee, total_amount, trace_id, created_at)
+VALUES
+  ('ORD-1043', 3, 6, 'accepted', 'cod', 'pickup',   NULL,               121.00, 0, 121.00, 'trc_1043', NOW() - interval '70 minutes'),
+  ('ORD-1042', 1, 4, 'accepted', 'cod', 'delivery', 'no onions please', 297.00, 0, 297.00, 'trc_1042', NOW() - interval '4 minutes'),
+  ('ORD-1041', 2, 5, 'accepted', 'cod', 'delivery', NULL,               182.00, 0, 182.00, 'trc_1041', NOW() - interval '13 minutes'),
+  ('ORD-1040', 3, 6, 'accepted', 'cod', 'pickup',   NULL,                64.00, 0,  64.00, 'trc_1040', NOW() - interval '41 minutes'),
+  ('ORD-1039', 1, 4, 'accepted', 'cod', 'delivery', 'second floor, ring the bell', 215.00, 0, 215.00, 'trc_1039', NOW() - interval '2 hours'),
+  ('ORD-1038', 2, 5, 'accepted', 'cod', 'delivery', NULL,               138.00, 0, 138.00, 'trc_1038', NOW() - interval '5 hours'),
+  ('ORD-1037', 3, 6, 'accepted', 'cod', 'delivery', 'call before coming', 268.00, 0, 268.00, 'trc_1037', NOW() - interval '26 hours'),
+  ('ORD-1036', 1, 4, 'accepted', 'cod', 'pickup',   NULL,                99.00, 0,  99.00, 'trc_1036', NOW() - interval '28 hours'),
+  ('ORD-1035', 2, 5, 'rejected', 'cod', 'delivery', NULL,                84.00, 0,  84.00, 'trc_1035', NOW() - interval '30 hours');
+
+INSERT INTO fulfillment
+  (master_order_id, shop_id, status, subtotal,
+   accepted_at, packed_at, out_for_delivery_at, delivered_at, rejected_at, rejection_reason, updated_at)
+SELECT m.id, 1, v.status, v.subtotal,
+       v.accepted_at, v.packed_at, v.out_at, v.delivered_at, v.rejected_at, v.reason,
+       COALESCE(v.delivered_at, v.rejected_at, v.out_at, v.packed_at, v.accepted_at)
+FROM (VALUES
+  ('ORD-1043','out_for_delivery',121.00, NOW() - interval '70 minutes', NOW() - interval '58 minutes', NOW() - interval '44 minutes', NULL, NULL, NULL),
+  ('ORD-1042','accepted',        297.00, NOW() - interval '4 minutes',  NULL, NULL, NULL, NULL, NULL),
+  ('ORD-1041','accepted',        182.00, NOW() - interval '13 minutes', NULL, NULL, NULL, NULL, NULL),
+  ('ORD-1040','packed',           64.00, NOW() - interval '41 minutes', NOW() - interval '31 minutes', NULL, NULL, NULL, NULL),
+  ('ORD-1039','out_for_delivery',215.00, NOW() - interval '2 hours',    NOW() - interval '105 minutes', NOW() - interval '80 minutes', NULL, NULL, NULL),
+  ('ORD-1038','delivered',       138.00, NOW() - interval '5 hours',    NOW() - interval '290 minutes', NOW() - interval '275 minutes', NOW() - interval '250 minutes', NULL, NULL),
+  ('ORD-1037','delivered',       268.00, NOW() - interval '26 hours',   NOW() - interval '25 hours', NOW() - interval '24 hours', NOW() - interval '23 hours', NULL, NULL),
+  ('ORD-1036','delivered',        99.00, NOW() - interval '28 hours',   NOW() - interval '27 hours', NOW() - interval '26 hours', NOW() - interval '25 hours', NULL, NULL),
+  ('ORD-1035','rejected',         84.00, NULL, NULL, NULL, NULL, NOW() - interval '30 hours', 'Out of stock for the day')
+) AS v(code,status,subtotal,accepted_at,packed_at,out_at,delivered_at,rejected_at,reason)
+JOIN master_order m ON m.order_code = v.code;
+
+INSERT INTO order_item (fulfillment_id, shop_product_id, quantity, unit_price, total_price)
+SELECT f.id, v.sp, v.qty, sp.selling_price, sp.selling_price * v.qty
+FROM (VALUES
+  ('ORD-1043', 3, 1), ('ORD-1043', 6, 2),
+  ('ORD-1042', 1, 3), ('ORD-1041', 2, 2), ('ORD-1041', 5, 1), ('ORD-1041', 7, 1),
+  ('ORD-1040', 4, 2), ('ORD-1039', 7, 1), ('ORD-1039', 8, 1), ('ORD-1038', 6, 2),
+  ('ORD-1038', 3, 2), ('ORD-1037', 1, 2), ('ORD-1037', 7, 1), ('ORD-1036', 1, 1),
+  ('ORD-1035', 2, 2)
+) AS v(code, sp, qty)
+JOIN master_order m ON m.order_code = v.code
+JOIN fulfillment f ON f.master_order_id = m.id
+JOIN shop_product sp ON sp.id = v.sp;
+
+-- Keep the stored subtotal in step with the lines it is made of.
+UPDATE fulfillment f SET subtotal = t.sum
+FROM (SELECT fulfillment_id, SUM(total_price) AS sum FROM order_item GROUP BY fulfillment_id) t
+WHERE t.fulfillment_id = f.id;
+UPDATE master_order m SET product_amount = f.subtotal, total_amount = f.subtotal
+FROM fulfillment f WHERE f.master_order_id = m.id;
+
+INSERT INTO order_event (master_order_id, fulfillment_id, event_type, actor, note, created_at)
+SELECT m.id, f.id, v.ev, v.actor, v.note, v.at
+FROM (VALUES
+  ('ORD-1043','placed','customer',NULL, NOW() - interval '70 minutes'),
+  ('ORD-1043','status_accepted','system','Auto-accepted', NOW() - interval '70 minutes'),
+  ('ORD-1043','status_packed','retailer',NULL, NOW() - interval '58 minutes'),
+  ('ORD-1043','status_out_for_delivery','retailer','Ready at the counter', NOW() - interval '44 minutes'),
+  ('ORD-1042','placed','customer',NULL, NOW() - interval '4 minutes'),
+  ('ORD-1042','status_accepted','system','Auto-accepted', NOW() - interval '4 minutes'),
+  ('ORD-1041','placed','customer',NULL, NOW() - interval '13 minutes'),
+  ('ORD-1041','status_accepted','system','Auto-accepted', NOW() - interval '13 minutes'),
+  ('ORD-1040','placed','customer',NULL, NOW() - interval '41 minutes'),
+  ('ORD-1040','status_accepted','system','Auto-accepted', NOW() - interval '41 minutes'),
+  ('ORD-1040','status_packed','retailer','Status changed to packed', NOW() - interval '31 minutes'),
+  ('ORD-1039','placed','customer',NULL, NOW() - interval '2 hours'),
+  ('ORD-1039','status_accepted','system','Auto-accepted', NOW() - interval '2 hours'),
+  ('ORD-1039','status_packed','retailer',NULL, NOW() - interval '105 minutes'),
+  ('ORD-1039','status_out_for_delivery','retailer',NULL, NOW() - interval '80 minutes'),
+  ('ORD-1038','placed','customer',NULL, NOW() - interval '5 hours'),
+  ('ORD-1038','status_accepted','system','Auto-accepted', NOW() - interval '5 hours'),
+  ('ORD-1038','status_packed','retailer',NULL, NOW() - interval '290 minutes'),
+  ('ORD-1038','status_out_for_delivery','retailer',NULL, NOW() - interval '275 minutes'),
+  ('ORD-1038','status_delivered','retailer',NULL, NOW() - interval '250 minutes'),
+  ('ORD-1037','placed','customer',NULL, NOW() - interval '26 hours'),
+  ('ORD-1037','status_accepted','system','Auto-accepted', NOW() - interval '26 hours'),
+  ('ORD-1037','status_packed','retailer',NULL, NOW() - interval '25 hours'),
+  ('ORD-1037','status_out_for_delivery','retailer',NULL, NOW() - interval '24 hours'),
+  ('ORD-1037','status_delivered','retailer',NULL, NOW() - interval '23 hours'),
+  ('ORD-1036','placed','customer',NULL, NOW() - interval '28 hours'),
+  ('ORD-1036','status_accepted','system','Auto-accepted', NOW() - interval '28 hours'),
+  ('ORD-1036','status_packed','retailer',NULL, NOW() - interval '27 hours'),
+  ('ORD-1036','status_out_for_delivery','retailer','Ready at the counter', NOW() - interval '26 hours'),
+  ('ORD-1036','status_delivered','retailer','Collected by the customer', NOW() - interval '25 hours'),
+  ('ORD-1035','placed','customer',NULL, NOW() - interval '30 hours'),
+  ('ORD-1035','status_rejected','retailer','Out of stock for the day', NOW() - interval '30 hours')
+) AS v(code, ev, actor, note, at)
+JOIN master_order m ON m.order_code = v.code
+JOIN fulfillment f ON f.master_order_id = m.id;
+

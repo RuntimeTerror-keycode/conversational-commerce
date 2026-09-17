@@ -1,6 +1,6 @@
-import { AppError } from '../lib/app-error';
+import { AppError, ShopUserRepository } from '@cc/domain';
 import { Logger } from '../logger/logger';
-import { ShopUserRepository } from '../repositories/shop-user.repository';
+import { ShopService } from './shop.service';
 import { IdentifyResponse } from '../types';
 
 export class IdentifyService {
@@ -37,6 +37,13 @@ export class IdentifyService {
         name: row.shop_name,
         isActive: row.shop_is_active,
         inventoryMode: row.inventory_mode,
+        openingTime: row.opening_time,
+        closingTime: row.closing_time,
+        openState: ShopService.openState(
+          row.shop_is_active,
+          row.opening_time,
+          row.closing_time,
+        ),
       },
     };
   }

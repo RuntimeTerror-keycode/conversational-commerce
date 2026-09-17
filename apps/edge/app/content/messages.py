@@ -6,6 +6,9 @@ def echo_text(text):
     return f"You sent:\n{text}"
 
 
+AGENT_TROUBLE = "One moment, having trouble on our end. Please try again shortly."
+
+
 def echo_transcript(transcript):
 
     return f"You said:\n{transcript}"
@@ -16,24 +19,9 @@ def voice_original_reply(original):
     return f"You said:\n{(original or '').strip()}"
 
 
-def voice_english_reply(english):
-
-    return f"In English:\n{(english or '').strip()}"
-
-
 AUDIO_NOT_UNDERSTOOD = (
     "Sorry, I couldn't understand the voice message."
 )
-
-
-def location_with_address(address, latitude, longitude):
-
-    return (
-        "Location received!\n\n"
-        f"Address:\n{address}\n\n"
-        f"Latitude: {latitude}\n"
-        f"Longitude: {longitude}"
-    )
 
 
 def location_without_address(latitude, longitude):

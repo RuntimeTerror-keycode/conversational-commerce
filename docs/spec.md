@@ -230,13 +230,18 @@ The grounding test is the one that catches the failure that will embarrass you o
 
 ```
 DATABASE_URL=
-ANTHROPIC_API_KEY=          # or GOOGLE_GENERATIVE_AI_API_KEY
 EDGE_NOTIFY_URL=            # Python edge POST /notify
 EDGE_SHARED_SECRET=         # symmetric, both directions
-MODEL_MAIN=claude-haiku-4-5
-MODEL_FAST=claude-haiku-4-5
+MODEL_PROVIDER=deepseek     # deepseek | anthropic | google — apps/agent/src/mastra/models.ts
+MODEL_MAIN=deepseek-flash   # or claude-haiku-4-5 / gemini-2.5-flash, matching MODEL_PROVIDER
+DEEPSEEK_API_KEY=           # or ANTHROPIC_API_KEY / GOOGLE_GENERATIVE_AI_API_KEY
 LOG_LEVEL=info
 ```
+
+Currently using DeepSeek as an interim provider (cheap, tool-calling capable) with an
+env-driven switch so moving to Claude or Gemini later is a config change, not a
+rewrite. `fast-agent`'s `MODEL_FAST` isn't relevant yet — that agent doesn't exist
+(§10, step 7).
 
 ---
 

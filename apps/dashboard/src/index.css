@@ -1,0 +1,23 @@
+@import 'tailwindcss';
+@import './styles/tokens.css';
+
+@layer base {
+  body {
+    @apply bg-canvas text-text font-sans text-body antialiased;
+  }
+  *:focus-visible {
+    @apply outline-none ring ring-border-focus ring-offset-2 ring-offset-canvas;
+  }
+}
+
+@layer utilities {
+  .font-numeric {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: 'tnum' 1, 'cv11' 1;
+  }
+
+  /* Form-field label: small, readable, not an eyebrow caption. */
+  .label {
+    @apply text-small font-medium text-text-secondary;
+  }
+}

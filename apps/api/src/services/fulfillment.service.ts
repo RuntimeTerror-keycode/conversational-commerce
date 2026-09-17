@@ -1,10 +1,12 @@
-import { AppError } from '../lib/app-error';
-import { Database } from '../lib/db';
+import {
+  AppError,
+  FulfillmentRepository,
+  OrderItemRepository,
+  OrderEventRepository,
+  ShopProductRepository,
+  IDatabase,
+} from '@cc/domain';
 import { Logger } from '../logger/logger';
-import { FulfillmentRepository } from '../repositories/fulfillment.repository';
-import { OrderItemRepository } from '../repositories/order-item.repository';
-import { OrderEventRepository } from '../repositories/order-event.repository';
-import { ShopProductRepository } from '../repositories/shop-product.repository';
 import {
   FulfillmentListResponse,
   FulfillmentDetail,
@@ -17,6 +19,7 @@ import {
   fulfillmentTimestampColumn,
   dashboardSettableStatuses,
 } from '../constants';
+import { NotifyService } from './notify.service';
 
 // ---------------------------------------------------------------------------
 // Params
@@ -48,7 +51,8 @@ export class FulfillmentService {
   private readonly orderItemRepo: OrderItemRepository;
   private readonly orderEventRepo: OrderEventRepository;
   private readonly shopProductRepo: ShopProductRepository;
-  private readonly db: Database;
+  private readonly db: IDatabase;
+  private readonly notifyService: NotifyService;
   private readonly logger: Logger;
 
   constructor(
@@ -56,7 +60,8 @@ export class FulfillmentService {
     orderItemRepo: OrderItemRepository,
     orderEventRepo: OrderEventRepository,
     shopProductRepo: ShopProductRepository,
-    db: Database,
+    db: IDatabase,
+    notifyService: NotifyService,
     logger: Logger,
   ) {
     this.fulfillmentRepo = fulfillmentRepo;
@@ -64,6 +69,7 @@ export class FulfillmentService {
     this.orderEventRepo = orderEventRepo;
     this.shopProductRepo = shopProductRepo;
     this.db = db;
+    this.notifyService = notifyService;
     this.logger = logger.child('FulfillmentService');
   }
 
@@ -75,10 +81,11 @@ export class FulfillmentService {
       throw AppError.validation(`Invalid status filter. Must be one of: ${fulfillmentStatuses.join(', ')}`);
     }
 
-    const [rows, total, statusRows] = await Promise.all([
+    const [rows, total, statusRows, revenue] = await Promise.all([
       this.fulfillmentRepo.findByShop({ shopId, status, since, limit, offset }),
       this.fulfillmentRepo.countByShop(shopId, status, since),
       this.fulfillmentRepo.statusCountsByShop(shopId),
+      this.fulfillmentRepo.revenueByShop(shopId),
     ]);
 
     const counts: FulfillmentCounts = {
@@ -104,6 +111,10 @@ export class FulfillmentService {
       })),
       page: { page, limit, total, hasMore: offset + limit < total },
       counts,
+      totals: {
+        deliveredRevenue: parseFloat(revenue.total),
+        deliveredRevenueToday: parseFloat(revenue.today),
+      },
       serverTime: new Date().toISOString(),
     };
   }
@@ -196,7 +207,33 @@ export class FulfillmentService {
       fulfillmentId, shopId, from: current.status, to: targetStatus,
     });
 
-    return this.detail(fulfillmentId, shopId);
+    const detail = await this.detail(fulfillmentId, shopId);
+
+    if (targetStatus === 'out_for_delivery') {
+      const body = [
+        '🚚 *Out for Delivery!*',
+        `Your order \`${detail.orderCode}\` is on its way!`,
+        '',
+        `📍 Delivering to: ${detail.delivery.address ?? 'your address'}`,
+        '',
+        "It'll be with you shortly. 😊",
+      ].join('\n');
+
+      await this.notifyService.send(detail.customer.phone, [{ type: 'text', body }], 'out_for_delivery', detail.traceId);
+    }
+
+    if (targetStatus === 'delivered') {
+      const body = [
+        '📦 *Delivered!*',
+        `Your order \`${detail.orderCode}\` has been delivered.`,
+        '',
+        'Thanks for shopping with us — enjoy! 🛍️',
+      ].join('\n');
+
+      await this.notifyService.send(detail.customer.phone, [{ type: 'text', body }], 'delivered', detail.traceId);
+    }
+
+    return detail;
   }
 
   public async updateItem(params: LineItemUpdate): Promise<FulfillmentDetail> {
@@ -215,30 +252,59 @@ export class FulfillmentService {
       throw AppError.notFound('Line item not found');
     }
 
-    if (remove) {
-      await this.orderItemRepo.delete(lineId);
-    } else if (substituteProductId) {
-      const product = await this.shopProductRepo.findForSubstitute(substituteProductId, shopId);
-      if (!product) {
-        throw AppError.notFound('Substitute product not found in this shop');
-      }
-      const qty = await this.orderItemRepo.getQuantity(lineId);
-      const newPrice = parseFloat(product.selling_price);
-      await this.orderItemRepo.substitute(lineId, substituteProductId, newPrice, newPrice * qty);
-    } else if (quantity !== undefined) {
-      if (!Number.isInteger(quantity) || quantity < 1) {
-        throw AppError.validation('quantity must be a positive integer');
-      }
-      const unitPrice = parseFloat(item.unit_price);
-      await this.orderItemRepo.updateQuantity(lineId, quantity, unitPrice * quantity);
-    } else {
-      throw AppError.validation('Provide quantity, substituteProductId, or remove');
-    }
+    const substitution = await this.db.transaction<{ oldName: string; newName: string } | null>(async (client) => {
+      let result: { oldName: string; newName: string } | null = null;
 
-    await this.fulfillmentRepo.recalcSubtotal(fulfillmentId);
+      if (remove) {
+        await this.orderItemRepo.delete(client, lineId);
+      } else if (substituteProductId) {
+        const existingItems = await this.orderItemRepo.findByFulfillment(fulfillmentId);
+        const existing = existingItems.find((i) => i.lineId === lineId);
+
+        if (existing?.shopProductId !== substituteProductId) {
+          const product = await this.shopProductRepo.findForSubstitute(substituteProductId, shopId);
+          if (!product) {
+            throw AppError.notFound('Substitute product not found in this shop');
+          }
+          const oldName = existing?.productName ?? 'an item';
+          const qty = await this.orderItemRepo.getQuantity(lineId);
+          const newPrice = parseFloat(product.selling_price);
+          await this.orderItemRepo.substitute(client, lineId, substituteProductId, newPrice, newPrice * qty);
+          result = { oldName, newName: product.local_name ?? 'a substitute item' };
+        }
+        // else: substituteProductId matches the item's current product — a no-op,
+        // skip the write and the customer notification.
+      } else if (quantity !== undefined) {
+        if (!Number.isInteger(quantity) || quantity < 1) {
+          throw AppError.validation('quantity must be a positive integer');
+        }
+        const unitPrice = parseFloat(item.unit_price);
+        await this.orderItemRepo.updateQuantity(client, lineId, quantity, unitPrice * quantity);
+      } else {
+        throw AppError.validation('Provide quantity, substituteProductId, or remove');
+      }
+
+      await this.fulfillmentRepo.recalcSubtotal(client, fulfillmentId);
+      return result;
+    });
 
     this.logger.info('Line item updated', { fulfillmentId, lineId, shopId });
 
-    return this.detail(fulfillmentId, shopId);
+    const detail = await this.detail(fulfillmentId, shopId);
+
+    if (substitution) {
+      const body = [
+        '🔄 *Item Substituted*',
+        `In your order \`${detail.orderCode}\`:`,
+        '',
+        `~${substitution.oldName}~ → *${substitution.newName}*`,
+        '',
+        "We made this swap to keep your order moving — reach out if you'd prefer something else!",
+      ].join('\n');
+
+      await this.notifyService.send(detail.customer.phone, [{ type: 'text', body }], 'substitution', detail.traceId);
+    }
+
+    return detail;
   }
 }

@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { Config } from '../config/config';
 import { Logger } from '../logger/logger';
-import { AppError } from '../lib/app-error';
+import { AppError } from '@cc/domain';
 import { ErrorResponse } from '../types';
 
 export class ErrorHandler {

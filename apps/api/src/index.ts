@@ -4,7 +4,9 @@ import { App } from './app';
 async function bootstrap(): Promise<void> {
   const deps = Setup.createDependencies();
 
-  await deps.broker.connect();
+  await deps.broker.connect().catch((err) => {
+    deps.logger.warn('RabbitMQ not available — running without message broker', { error: String(err) });
+  });
 
   const app = new App(deps);
   app.listen();

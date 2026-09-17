@@ -1,0 +1,209 @@
+/* ============================================================
+   Kadakaran — shopkeeper portal · design tokens
+   Tailwind v4, CSS-first. Everything Tailwind needs to generate
+   utilities lives in @theme; v4 reads these directly.
+
+   Source: the Kadakaran design canvas, "Foundations" artboard.
+
+   The idea: a well-run counter, not a dashboard. Warm paper
+   ground, ink text, one teal for action, and one clay for the
+   only thing that ever demands attention — an order that has
+   just arrived.
+
+   Amber and red are RESERVED. Nothing routine in this product
+   may use them, so when they do appear — a failed action, a lost
+   connection — they still mean something. That is why a rejected
+   order and an out-of-stock product are neutral, not red.
+
+   Do not put raw hex in component code. Add it here first.
+   ============================================================ */
+
+@theme {
+  /* Clear Tailwind's defaults — `bg-blue-500` must not compile. */
+  --color-*: initial;
+  --color-transparent: transparent;
+  --color-current: currentColor;
+  --color-white: #ffffff;
+
+  /* ---------- Ground & ink ---------------------------------- */
+  --color-canvas:         #FBFAF7; /* paper — app background */
+  --color-surface:        #FFFFFF; /* panels, tables, rows */
+  --color-surface-raised: #FFFFFF; /* drawers, toasts (+ shadow) */
+  --color-surface-sunken: #F6F4EE; /* sidebar, table headers, wells */
+  --color-surface-hover:  #F6F4EE; /* row hover */
+
+  --color-border:         #E4E0D6; /* default hairline */
+  --color-border-strong:  #CFCABB; /* inputs */
+  --color-border-focus:   #1F6F63;
+
+  --color-text:           #1A1916; /* 15.9:1 on paper */
+  --color-text-secondary: #4A463D; /*  9.2:1 */
+  --color-text-muted:     #6E695C; /*  5.5:1 — AA at 14px+ */
+  --color-text-disabled:  #A9A395; /* decorative only, never body */
+  --color-text-inverse:   #FBFAF7;
+
+  /* ---------- Accent · the one colour for action ------------- */
+  --color-accent:         #1F6F63; /* 6.1:1 on white */
+  --color-accent-hover:   #17564D;
+  --color-accent-active:  #124039;
+  --color-accent-subtle:  #ECF3F1;
+  --color-accent-border:  #BFD8D2;
+  --color-on-accent:      #FFFFFF;
+
+  /* ---------- Order status · paired fg/bg -------------------
+     Every pair clears 4.5:1, and every badge carries a word and
+     a mark as well as a hue. */
+
+  /* New — just arrived, untouched. The loudest thing on screen. */
+  --color-warning:        #8E3B1C;
+  --color-warning-fg:     #8E3B1C; /* 6.5:1 on its bg */
+  --color-warning-bg:     #FBEDE5;
+  --color-warning-border: #F0D9CB;
+
+  /* Packed — bagged, waiting for the run. */
+  --color-info:           #2A4B8D;
+  --color-info-fg:        #2A4B8D; /* 7.3:1 */
+  --color-info-bg:        #EAEFF9;
+  --color-info-border:    #D3DCF0;
+
+  /* Out for delivery — with the driver. */
+  --color-violet:         #5A3E96;
+  --color-violet-fg:      #5A3E96; /* 7.0:1 */
+  --color-violet-bg:      #F0EBF9;
+  --color-violet-border:  #DED3F0;
+
+  /* Delivered — terminal. */
+  --color-success:        #2C6A48;
+  --color-success-fg:     #2C6A48; /* 5.5:1 */
+  --color-success-bg:     #E9F1EB;
+  --color-success-border: #D6E6DC;
+
+  /* Neutral — rejected orders, out-of-stock products, plain chips.
+     Deliberately not red: neither is a failure, and spending red on
+     routine states is what makes a real failure invisible. */
+  --color-neutral-fg:     #55514A; /* 7.1:1 */
+  --color-neutral-bg:     #EFEDE7;
+  --color-neutral-border: #E0DCD2;
+
+  /* Danger — RESERVED. A failed action, nothing routine. */
+  --color-danger:         #A32A1E;
+  --color-danger-fg:      #A32A1E;
+  --color-danger-hover:   #872217;
+  --color-danger-bg:      #FBEAE7;
+  --color-danger-border:  #F0CFC9;
+
+  /* ---------- Sidebar · light, not a dark rail --------------- */
+  --color-sidebar:             #F6F4EE;
+  --color-sidebar-hover:       #EFEDE7;
+  --color-sidebar-active:      #FFFFFF;
+  --color-sidebar-text:        #6E695C;
+  --color-sidebar-text-active: #1A1916;
+  --color-sidebar-border:      #E4E0D6;
+
+  /* ---------- Type ------------------------------------------
+     IBM Plex Sans for Latin; Noto Sans Malayalam picks up
+     Malayalam glyphs per character, so "ചായ പൊടി" needs no
+     special casing. */
+  --font-sans: 'IBM Plex Sans', 'Noto Sans Malayalam', system-ui, -apple-system, sans-serif;
+  --font-numeric: 'IBM Plex Sans', 'Noto Sans Malayalam', system-ui, sans-serif;
+  /** Order codes only — they are identifiers, and read as such. */
+  --font-code: 'IBM Plex Mono', ui-monospace, monospace;
+
+  --text-metric: 2.125rem;            /* 34 — hero figures, ₹608 */
+  --text-metric--line-height: 1.1;
+  --text-metric--letter-spacing: -0.02em;
+  --text-metric--font-weight: 600;
+
+  --text-h1: 2rem;                    /* 32 — page titles */
+  --text-h1--line-height: 1.1;
+  --text-h1--letter-spacing: -0.02em;
+  --text-h1--font-weight: 500;
+
+  --text-h2: 1.25rem;                 /* 20 — shop name */
+  --text-h2--line-height: 1.3;
+  --text-h2--letter-spacing: -0.01em;
+  --text-h2--font-weight: 600;
+
+  --text-h3: 1rem;                    /* 16 — section, order code */
+  --text-h3--line-height: 1.4;
+  --text-h3--font-weight: 600;
+
+  --text-body: 0.875rem;              /* 14 — body */
+  --text-body--line-height: 1.5;
+  --text-body--font-weight: 400;
+
+  --text-small: 0.8125rem;            /* 13 — secondary, dense rows */
+  --text-small--line-height: 1.5;
+  --text-small--font-weight: 400;
+
+  --text-caption: 0.6875rem;          /* 11 — caps labels */
+  --text-caption--line-height: 1.45;
+  --text-caption--letter-spacing: 0.06em;
+  --text-caption--font-weight: 600;
+
+  /* ---------- Layout ----------------------------------------
+     The canvas draws a 248px sidebar on a 1440 frame and keeps the
+     content column measured rather than full-bleed. */
+  --spacing: 0.25rem;               /* 4px base — 4·8·12·16·24·32·48·64 */
+  --spacing-sidebar:           15.5rem; /* 248px */
+  --spacing-sidebar-collapsed: 4rem;
+  --spacing-topbar:            4rem;
+
+  --width-content: 90rem;
+  --width-form:    28rem;
+
+  --breakpoint-sm: 23.4375rem;
+  --breakpoint-md: 48rem;
+  --breakpoint-lg: 80rem;
+  --breakpoint-xl: 96rem;
+
+  /* ---------- Radii · 4 input, 6 button, 10 panel ------------ */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 10px;
+  --radius-xl: 10px;
+  --radius-2xl: 14px;
+
+  /* ---------- Elevation · two levels only -------------------
+     Flat is border-only. Lifted is drawers and toasts. Anything
+     heavier reads as a template. */
+  --shadow-xs: 0 0 0 0 rgb(0 0 0 / 0);
+  --shadow-sm: 0 1px 2px rgb(26 25 22 / 0.05);
+  --shadow-md: 0 2px 8px rgb(26 25 22 / 0.07);
+  --shadow-lg: 0 8px 32px rgb(26 25 22 / 0.12);
+
+  /* ---------- Motion ---------------------------------------- */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
+
+  --animate-shimmer: shimmer 1200ms ease-in-out infinite;
+  --animate-fade-in: fade-in 120ms ease-out;
+  --animate-slide-up: slide-up 180ms var(--ease-out) backwards;
+  --animate-drawer-in: drawer-in 180ms var(--ease-out);
+}
+
+:root {
+  --duration-state: 120ms;  /* badge or row state change */
+  --duration-drawer: 180ms;
+  --duration-shimmer: 1200ms;
+}
+
+@keyframes shimmer {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slide-up {
+  from { transform: translateY(4px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes drawer-in {
+  from { transform: translateX(16px); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}

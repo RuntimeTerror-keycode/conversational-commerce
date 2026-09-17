@@ -14,6 +14,11 @@ export interface IdentifyShop {
   name: string;
   isActive: boolean;
   inventoryMode: string;
+  /** "HH:MM", or null when the shop has not set hours. */
+  openingTime: string | null;
+  closingTime: string | null;
+  /** Derived from isActive + hours. See ShopService.openState. */
+  openState: 'open' | 'closed' | 'offline' | 'always_open';
 }
 
 export interface IdentifyResponse {

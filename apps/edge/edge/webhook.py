@@ -1,4 +1,5 @@
 import logging
+import time
 
 from fastapi import APIRouter, BackgroundTasks, Request, Response
 
@@ -18,9 +19,28 @@ logger = logging.getLogger("edge.webhook")
 
 router = APIRouter()
 
+# Meta retries a webhook delivery it didn't get a fast ack for, redelivering
+# the same messageId. docs/contracts.md §A1 requires idempotency on
+# messageId for 10 minutes so a retry can't double-process an order.
+_DEDUP_TTL_SECONDS = 600
+_seen_message_ids: dict[str, float] = {}
 
-def process_webhook(data: dict) -> None:
-    """Original WhatsApp inbound handling — no agent call."""
+
+def _already_processed(message_id: str) -> bool:
+    now = time.monotonic()
+
+    expired = [mid for mid, seen_at in _seen_message_ids.items() if now - seen_at > _DEDUP_TTL_SECONDS]
+    for mid in expired:
+        del _seen_message_ids[mid]
+
+    if message_id in _seen_message_ids:
+        return True
+
+    _seen_message_ids[message_id] = now
+    return False
+
+
+async def process_webhook(data: dict) -> None:
     try:
         value = data["entry"][0]["changes"][0]["value"]
 
@@ -36,17 +56,22 @@ def process_webhook(data: dict) -> None:
         message = value["messages"][0]
         sender = message["from"]
         message_type = message["type"]
+        message_id = message.get("id")
+
+        if message_id and _already_processed(message_id):
+            logger.info("Duplicate messageId=%s from Sender=%s — skipping (Meta retry)", message_id, sender)
+            return
 
         logger.info("Sender=%s type=%s", sender, message_type)
 
         if message_type == "text":
-            handle_text_message(message, sender)
+            await handle_text_message(message, sender)
         elif message_type == "audio":
-            handle_audio_message(message, sender)
+            await handle_audio_message(message, sender)
         elif message_type == "location":
-            handle_location_message(message, sender)
+            await handle_location_message(message, sender)
         elif message_type == "interactive":
-            handle_interactive_message(message, sender)
+            await handle_interactive_message(message, sender)
         else:
             handle_unknown_message(message_type, sender)
 
