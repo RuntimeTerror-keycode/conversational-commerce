@@ -13,6 +13,22 @@ function truncate(text: string, maxLength: number): string {
   return text.length > maxLength ? `${text.slice(0, maxLength - 1)}…` : text;
 }
 
+/**
+ * Rare DeepSeek sampling glitch: the same sentence comes back twice in a row
+ * with no separator ("Added milk.Added milk. Anything else?"). Not a
+ * framework bug — result.text is genuinely the model's own final-step output
+ * verbatim. Collapse the longest exact repeated prefix as a safety net so it
+ * never reaches the customer looking broken.
+ */
+function collapseLeadingDuplicate(text: string): string {
+  for (let i = Math.floor(text.length / 2); i >= 20; i--) {
+    if (text.slice(0, i) === text.slice(i, 2 * i)) {
+      return text.slice(i);
+    }
+  }
+  return text;
+}
+
 function wasOrderPlaced(steps: Array<{ toolResults?: Array<{ payload: { toolName: string; result: unknown } }> }>): boolean {
   return steps.some((step) =>
     step.toolResults?.some(
@@ -57,6 +73,10 @@ export async function agentTurn(req: Request, res: Response) {
     const result = await shoppingAgent.generate(text, {
       memory: scopeFor(customerId, sessionId),
       requestContext,
+      // Mastra's default (5) is too low for a turn with several items —
+      // search + updateCart per item can exceed it, forcing a truncated,
+      // empty-sounding reply once the step budget runs out mid-reasoning.
+      maxSteps: 20,
     });
 
     const toolCallNames = result.toolCalls.map((tc) => tc.payload.toolName);
@@ -70,7 +90,6 @@ export async function agentTurn(req: Request, res: Response) {
         usage: result.usage,
       }),
     );
-
     const orderPlaced = wasOrderPlaced(result.steps);
     if (orderPlaced) {
       rotateSession(customerId);
@@ -79,7 +98,7 @@ export async function agentTurn(req: Request, res: Response) {
     const response: AgentTurnResponse = {
       traceId,
       sessionState: orderPlaced ? "order_placed" : "active",
-      blocks: [{ type: "text", body: truncate(result.text, MAX_BODY_LENGTH) }],
+      blocks: [{ type: "text", body: truncate(collapseLeadingDuplicate(result.text), MAX_BODY_LENGTH) }],
     };
 
     res.status(200).json(response);
