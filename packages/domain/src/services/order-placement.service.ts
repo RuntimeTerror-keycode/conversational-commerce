@@ -20,6 +20,7 @@ import { MasterOrderRepository } from '../repositories/master-order.repository';
 import { OrderEventRepository } from '../repositories/order-event.repository';
 import { OrderItemRepository } from '../repositories/order-item.repository';
 import { ShopRepository } from '../repositories/shop.repository';
+import { generateOrderCode } from '../lib/order-code';
 import {
   confirmationTokenTtlMinutes,
   defaultEtaMinutes,
@@ -91,7 +92,7 @@ export class OrderPlacementService {
     const customerAddress = await this.customerRepo.findWithDefaultAddress(customerId);
     const addressId = customerAddress?.address_id ?? 0;
 
-    const orderCode = this.generateOrderCode();
+    const orderCode = generateOrderCode();
     const cartHash = this.computeCartHash(cartItems);
 
     const snapshot: ConfirmedSnapshot = {
@@ -399,11 +400,5 @@ export class OrderPlacementService {
       })),
       subtotal: Math.round(a.subtotal * 100) / 100,
     }));
-  }
-
-  private generateOrderCode(): string {
-    const ts = Date.now().toString(36).toUpperCase();
-    const rand = randomBytes(2).toString('hex').toUpperCase();
-    return `ORD-${ts}-${rand}`;
   }
 }

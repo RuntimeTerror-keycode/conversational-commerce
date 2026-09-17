@@ -1,26 +1,23 @@
 import { AppError } from '../lib/app-error';
 import { ILogger, DomainProduct, AvailabilityResult } from '../types';
 import { CatalogRepository } from '../repositories/catalog.repository';
-import { RetailerResolveService } from './retailer-resolve.service';
 import { defaultSearchLimit, maxSearchLimit } from '../constants';
 
 export class CatalogSearchService {
   private readonly catalogRepo: CatalogRepository;
-  private readonly retailerService: RetailerResolveService;
   private readonly logger: ILogger;
 
   constructor(
     catalogRepo: CatalogRepository,
-    retailerService: RetailerResolveService,
     logger: ILogger,
   ) {
     this.catalogRepo = catalogRepo;
-    this.retailerService = retailerService;
     this.logger = logger.child('CatalogSearchService');
   }
 
+  /** retailerId is the scoping boundary — search is always against a single shop. */
   public async searchProducts(
-    customerId: string,
+    retailerId: string,
     query: string,
     opts?: { attributes?: Record<string, string>; limit?: number },
   ): Promise<DomainProduct[]> {
@@ -28,23 +25,22 @@ export class CatalogSearchService {
       throw AppError.validation('query is required');
     }
 
-    const limit = Math.min(opts?.limit ?? defaultSearchLimit, maxSearchLimit);
-    const nearbyShopIds = await this.retailerService.resolveNearbyShopIds(customerId);
-
-    if (nearbyShopIds.length === 0) {
-      return [];
+    const shopId = parseInt(retailerId, 10);
+    if (isNaN(shopId)) {
+      throw AppError.validation('retailerId must be a valid number');
     }
 
+    const limit = Math.min(opts?.limit ?? defaultSearchLimit, maxSearchLimit);
     const tokens = this.tokenize(query);
 
     if (tokens.length === 0) {
       return [];
     }
 
-    const rows = await this.catalogRepo.search(tokens, nearbyShopIds, limit);
+    const rows = await this.catalogRepo.search(tokens, [shopId], limit);
 
     this.logger.info('Product search', {
-      customerId,
+      retailerId,
       query,
       tokens,
       resultCount: rows.length,

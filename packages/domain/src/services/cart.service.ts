@@ -4,14 +4,12 @@ import { CartRepository } from '../repositories/cart.repository';
 import { CatalogRepository } from '../repositories/catalog.repository';
 import { CustomerRepository } from '../repositories/customer.repository';
 import { ShopProductRepository } from '../repositories/shop-product.repository';
-import { RetailerResolveService } from './retailer-resolve.service';
 
 export class CartService {
   private readonly cartRepo: CartRepository;
   private readonly catalogRepo: CatalogRepository;
   private readonly customerRepo: CustomerRepository;
   private readonly shopProductRepo: ShopProductRepository;
-  private readonly retailerService: RetailerResolveService;
   private readonly logger: ILogger;
 
   constructor(
@@ -19,18 +17,22 @@ export class CartService {
     catalogRepo: CatalogRepository,
     customerRepo: CustomerRepository,
     shopProductRepo: ShopProductRepository,
-    retailerService: RetailerResolveService,
     logger: ILogger,
   ) {
     this.cartRepo = cartRepo;
     this.catalogRepo = catalogRepo;
     this.customerRepo = customerRepo;
     this.shopProductRepo = shopProductRepo;
-    this.retailerService = retailerService;
     this.logger = logger.child('CartService');
   }
 
-  public async getCart(customerId: string): Promise<DomainCart> {
+  /** retailerId is the scoping boundary — cart pricing is always against a single shop. */
+  public async getCart(retailerId: string, customerId: string): Promise<DomainCart> {
+    const shopId = parseInt(retailerId, 10);
+    if (isNaN(shopId)) {
+      throw AppError.validation('retailerId must be a valid number');
+    }
+
     const customer = await this.customerRepo.findByPhone(customerId);
     if (!customer) {
       throw AppError.notFound('Customer not found');
@@ -38,9 +40,8 @@ export class CartService {
 
     const cartId = await this.cartRepo.findOrCreate(customer.id);
     const items = await this.cartRepo.findItems(cartId);
-    const nearbyShopIds = await this.retailerService.resolveNearbyShopIds(customerId);
 
-    const lines = await this.buildCartLines(items, nearbyShopIds);
+    const lines = await this.buildCartLines(items, [shopId]);
     const total = lines.reduce((sum, line) => sum + line.price * line.quantity, 0);
 
     return {
@@ -51,7 +52,12 @@ export class CartService {
     };
   }
 
-  public async mutateCart(customerId: string, op: CartOpInput): Promise<DomainCart> {
+  public async mutateCart(retailerId: string, customerId: string, op: CartOpInput): Promise<DomainCart> {
+    const shopId = parseInt(retailerId, 10);
+    if (isNaN(shopId)) {
+      throw AppError.validation('retailerId must be a valid number');
+    }
+
     const customer = await this.customerRepo.findByPhone(customerId);
     if (!customer) {
       throw AppError.notFound('Customer not found');
@@ -74,10 +80,9 @@ export class CartService {
         if (op.quantity <= 0) {
           throw AppError.validation('quantity must be positive for add');
         }
-        const nearbyShopIds = await this.retailerService.resolveNearbyShopIds(customerId);
-        const available = await this.catalogRepo.isAvailableAtAnyShop(catalogId, nearbyShopIds);
+        const available = await this.catalogRepo.isAvailableAtAnyShop(catalogId, [shopId]);
         if (!available) {
-          throw AppError.validation('Product is not available at any nearby shop');
+          throw AppError.validation('Product is not available at this shop');
         }
         await this.cartRepo.addItem(cartId, catalogId, op.quantity);
         break;
@@ -111,13 +116,14 @@ export class CartService {
     await this.cartRepo.updateTimestamp(cartId);
 
     this.logger.info('Cart mutated', {
+      retailerId,
       customerId,
       action: op.action,
       productId: op.productId,
       quantity: op.quantity,
     });
 
-    return this.getCart(customerId);
+    return this.getCart(retailerId, customerId);
   }
 
   private async buildCartLines(

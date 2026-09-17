@@ -1,5 +1,6 @@
 import { PoolClient } from 'pg';
 import { IDatabase, MasterOrderRow, MasterOrderInsert } from '../types';
+import { generateOrderCode } from '../lib/order-code';
 
 export class MasterOrderRepository {
   private readonly db: IDatabase;
@@ -68,5 +69,53 @@ export class MasterOrderRepository {
       "DELETE FROM master_order WHERE status = 'draft' AND token_expires_at < NOW()",
     );
     return result.rowCount ?? 0;
+  }
+
+  // -------------------------------------------------------------------------
+  // WhatsApp session drafts — a lightweight, pre-checkout `orderId` handle.
+  // Distinct from createDraft() above (which is the checkout-confirmation
+  // draft, always has a confirmation_token). A session draft has
+  // confirmation_token = NULL and is the row a WhatsApp orderId resolves to
+  // before the customer has confirmed anything.
+  // -------------------------------------------------------------------------
+
+  public async findOpenSessionDraft(customerId: number): Promise<MasterOrderRow | null> {
+    const result = await this.db.query<MasterOrderRow>(
+      `SELECT * FROM master_order
+       WHERE customer_id = $1 AND status = 'draft' AND confirmation_token IS NULL
+       ORDER BY created_at DESC LIMIT 1`,
+      [customerId],
+    );
+    return result.rows[0] ?? null;
+  }
+
+  public async createSessionDraft(input: {
+    customerId: number;
+    addressId: number;
+    paymentMode: string;
+  }): Promise<MasterOrderRow> {
+    const orderCode = generateOrderCode();
+    const result = await this.db.query<MasterOrderRow>(
+      `INSERT INTO master_order (order_code, customer_id, address_id, status, payment_mode, product_amount, total_amount)
+       VALUES ($1, $2, $3, 'draft', $4, 0, 0)
+       RETURNING *`,
+      [orderCode, input.customerId, input.addressId, input.paymentMode.toLowerCase()],
+    );
+    return result.rows[0];
+  }
+
+  public async updateSessionDraft(orderId: number, addressId: number, paymentMode: string): Promise<void> {
+    await this.db.query(
+      `UPDATE master_order SET address_id = $2, payment_mode = $3, updated_at = NOW() WHERE id = $1`,
+      [orderId, addressId, paymentMode.toLowerCase()],
+    );
+  }
+
+  public async findById(orderId: number): Promise<MasterOrderRow | null> {
+    const result = await this.db.query<MasterOrderRow>(
+      `SELECT * FROM master_order WHERE id = $1`,
+      [orderId],
+    );
+    return result.rows[0] ?? null;
   }
 }

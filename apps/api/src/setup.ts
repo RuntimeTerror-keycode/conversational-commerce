@@ -15,6 +15,7 @@ import {
   CatalogRepository,
   CartRepository,
   MasterOrderRepository,
+  MessageRepository,
 } from '@cc/domain';
 
 // Dashboard services — stay in apps/api
@@ -28,7 +29,11 @@ import {
   CatalogSearchService,
   CartService,
   OrderPlacementService,
+  SessionService,
 } from '@cc/domain';
+
+// WhatsApp orchestration — stays in apps/api (schema/routing only, calls @cc/domain)
+import { WhatsappService } from './services/whatsapp.service';
 
 // Controllers
 import { HealthController } from './controllers/health.controller';
@@ -39,11 +44,13 @@ import { RetailerController } from './controllers/retailer.controller';
 import { CatalogController } from './controllers/catalog.controller';
 import { CartController } from './controllers/cart.controller';
 import { OrderController } from './controllers/order.controller';
+import { WhatsappController } from './controllers/whatsapp.controller';
 
 // Middlewares
 import { RequestLogger } from './middlewares/request-logger.middleware';
 import { CorsMiddleware } from './middlewares/cors.middleware';
 import { ShopContextMiddleware } from './middlewares/shop-context.middleware';
+import { ServiceAuthMiddleware } from './middlewares/service-auth.middleware';
 import { NotFoundHandler } from './middlewares/not-found.middleware';
 import { ErrorHandler } from './middlewares/error-handler.middleware';
 
@@ -56,12 +63,14 @@ export interface AppControllers {
   catalog: CatalogController;
   cart: CartController;
   order: OrderController;
+  whatsapp: WhatsappController;
 }
 
 export interface AppMiddlewares {
   cors: CorsMiddleware;
   requestLogger: RequestLogger;
   shopContext: ShopContextMiddleware;
+  serviceAuth: ServiceAuthMiddleware;
   notFound: NotFoundHandler;
   error: ErrorHandler;
 }
@@ -93,6 +102,7 @@ export class Setup {
     const catalogRepo = new CatalogRepository(db);
     const cartRepo = new CartRepository(db);
     const masterOrderRepo = new MasterOrderRepository(db);
+    const messageRepo = new MessageRepository(db);
 
     // Dashboard services
     const identifyService = new IdentifyService(shopUserRepo, logger);
@@ -103,9 +113,9 @@ export class Setup {
 
     // Agent-facing services (from @cc/domain, take ILogger)
     const retailerService = new RetailerResolveService(customerRepo, shopRepo, logger);
-    const catalogService = new CatalogSearchService(catalogRepo, retailerService, logger);
+    const catalogService = new CatalogSearchService(catalogRepo, logger);
     const cartService = new CartService(
-      cartRepo, catalogRepo, customerRepo, shopProductRepo, retailerService, logger,
+      cartRepo, catalogRepo, customerRepo, shopProductRepo, logger,
     );
     const orderPlacementService = new OrderPlacementService({
       cartRepo,
@@ -118,6 +128,12 @@ export class Setup {
       db,
       logger,
     });
+    const sessionService = new SessionService(customerRepo, masterOrderRepo, messageRepo, logger);
+
+    // WhatsApp orchestration
+    const whatsappService = new WhatsappService(
+      sessionService, retailerService, catalogService, cartService, logger,
+    );
 
     return {
       config,
@@ -130,14 +146,16 @@ export class Setup {
         fulfillment: new FulfillmentController(fulfillmentService),
         inventory: new InventoryController(inventoryService),
         retailer: new RetailerController(retailerService),
-        catalog: new CatalogController(catalogService),
-        cart: new CartController(cartService),
+        catalog: new CatalogController(catalogService, retailerService),
+        cart: new CartController(cartService, retailerService),
         order: new OrderController(orderPlacementService),
+        whatsapp: new WhatsappController(whatsappService),
       },
       middlewares: {
         cors: new CorsMiddleware(),
         requestLogger: new RequestLogger(logger),
         shopContext: new ShopContextMiddleware(db, logger),
+        serviceAuth: new ServiceAuthMiddleware(config),
         notFound: new NotFoundHandler(logger),
         error: new ErrorHandler(config, logger),
       },

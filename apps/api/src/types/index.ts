@@ -65,3 +65,4 @@ export interface PaginatedResponse<T> {
 export * from './identify.types';
 export * from './fulfillment.types';
 export * from './inventory.types';
+export * from './whatsapp.types';
