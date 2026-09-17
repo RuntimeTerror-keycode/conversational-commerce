@@ -58,7 +58,7 @@ export const NotifyRequest = z.object({
   traceId: z.string(),
   customerRef: z.string(),
   blocks: z.array(ReplyBlock).max(2),
-  reason: z.enum(["order_accepted", "order_rejected", "out_for_delivery", "substitution"]),
+  reason: z.enum(["order_accepted", "order_rejected", "out_for_delivery", "delivered", "substitution"]),
 });
 
 export type ReplyBlock = z.infer<typeof ReplyBlock>;

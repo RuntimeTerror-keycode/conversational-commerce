@@ -15,11 +15,21 @@ export const shoppingAgent = new Agent({
   id: "shopping-agent",
   name: "Shopping Agent",
   instructions: ({ requestContext }: { requestContext: ShoppingRequestContext }) => {
-    const retailerName = requestContext.get("retailerName") ?? "the store";
+    // Deliberately not interpolating the real shop name in here — the model
+    // is never given it, so it can't leak it into a reply.
     const area = requestContext.get("area") ?? "your area";
-    return promptTemplate
-      .replaceAll("{{retailerName}}", retailerName)
-      .replaceAll("{{area}}", area);
+    let prompt = promptTemplate.replaceAll("{{area}}", area);
+
+    if (requestContext.get("requireAddressFirst")) {
+      prompt +=
+        "\n\n## This turn only\n\n" +
+        "This is the first message of a new session, it came in as voice, and there is no delivery address on file. " +
+        "Before anything else, ask for their delivery address in this reply — do not search the catalogue, build the cart, " +
+        "or otherwise act on what they asked for yet. Once they answer with an address, call `setDeliveryAddress`, " +
+        "acknowledge it briefly, then continue with what they originally asked for (it's still in this conversation).";
+    }
+
+    return prompt;
   },
   model: mainModel,
   tools: shoppingTools,

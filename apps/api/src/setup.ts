@@ -125,7 +125,7 @@ export class Setup {
     // Dashboard services
     const identifyService = new IdentifyService(shopUserRepo, logger);
     const fulfillmentService = new FulfillmentService(
-      fulfillmentRepo, orderItemRepo, orderEventRepo, shopProductRepo, shopRepo, db, notifyService, logger,
+      fulfillmentRepo, orderItemRepo, orderEventRepo, shopProductRepo, db, notifyService, logger,
     );
     const inventoryService = new InventoryService(shopProductRepo, shopRepo, logger);
     const shopService = new ShopService(shopRepo, logger);

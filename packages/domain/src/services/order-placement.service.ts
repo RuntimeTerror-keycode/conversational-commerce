@@ -61,6 +61,41 @@ export class OrderPlacementService {
   }
 
   /**
+   * Save a delivery address exactly as the customer typed it in chat. No
+   * coordinates — WhatsApp text has none, and guessing them from a pasted
+   * map link or landmark name is not this service's job (nor the model's;
+   * see apps/agent's prompt). A real WhatsApp location share still goes
+   * through here as text, geocoded upstream by the edge before it arrives.
+   */
+  public async setDeliveryAddress(customerId: string, addressLine: string): Promise<{ deliveryAddress: string }> {
+    const customer = await this.customerRepo.findByPhone(customerId);
+    if (!customer) throw AppError.notFound('Customer not found');
+
+    const trimmed = addressLine.trim();
+    if (trimmed.length < 3) {
+      throw AppError.validation('Address is too short to be usable');
+    }
+
+    await this.customerRepo.upsertDefaultAddress(customer.id, { addressLine: trimmed });
+
+    this.logger.info('Delivery address set', { customerId: customer.id });
+
+    return { deliveryAddress: trimmed };
+  }
+
+  /** Save the customer's chosen payment method — 'cod' or 'gpay'. */
+  public async setPaymentMode(customerId: string, mode: 'cod' | 'gpay'): Promise<{ paymentMode: string }> {
+    const customer = await this.customerRepo.findByPhone(customerId);
+    if (!customer) throw AppError.notFound('Customer not found');
+
+    await this.customerRepo.setDefaultPaymentMode(customer.id, mode);
+
+    this.logger.info('Payment mode set', { customerId: customer.id, mode });
+
+    return { paymentMode: mode };
+  }
+
+  /**
    * Snapshot the cart, run the splitting algorithm, persist the
    * snapshot on the draft order, and return a confirmation token.
    */
@@ -91,6 +126,8 @@ export class OrderPlacementService {
 
     const customerAddress = await this.customerRepo.findWithDefaultAddress(customerId);
     const addressId = customerAddress?.address_id ?? 0;
+    const deliveryAddress = this.formatAddress(customerAddress);
+    const paymentMode = customerAddress?.default_payment_mode ?? null;
 
     const cartHash = this.computeCartHash(cartItems);
 
@@ -106,6 +143,7 @@ export class OrderPlacementService {
 
     const confirmationFields = {
       addressId,
+      paymentMode: paymentMode ?? 'cod',
       productAmount: totalAmount,
       totalAmount,
       confirmationToken: token,
@@ -142,7 +180,19 @@ export class OrderPlacementService {
       confirmationToken: token,
       expiresAt: expiresAt.toISOString(),
       shopBreakdown,
+      deliveryAddress,
+      paymentMode,
     };
+  }
+
+  private formatAddress(
+    address: { label: string | null; address_line: string | null; city: string | null } | null,
+  ): string | null {
+    if (!address) return null;
+    const parts = [address.label, address.address_line, address.city].filter(
+      (part): part is string => Boolean(part && part.trim()),
+    );
+    return parts.length > 0 ? parts.join(', ') : null;
   }
 
   /**
@@ -398,9 +448,12 @@ export class OrderPlacementService {
   }
 
   private buildBreakdown(assignments: SnapshotAssignment[]): ShopBreakdownEntry[] {
-    return assignments.map((a) => ({
+    // shopName is deliberately a positional label, not the real supermarket
+    // name — the customer must never learn which brand is fulfilling their
+    // order. Fixed in code, not left to prompting, so it can't leak.
+    return assignments.map((a, index) => ({
       shopId: String(a.shopId),
-      shopName: a.shopName,
+      shopName: `Store ${index + 1}`,
       items: a.items.map((item) => ({
         lineId: String(item.shopProductId),
         productName: item.productName,

@@ -1,7 +1,7 @@
 from fastapi import APIRouter
 
 from app.handlers import handle_interactive, handle_order_confirmation_reply
-from app.routers.deps import run_action
+from app.routers.deps import run_action, run_action_async
 from app.schemas import (
     DestinationRequest,
     InteractiveRequest,
@@ -53,9 +53,9 @@ def trigger_poll_reply(body: PollReplyRequest):
     "/interactive",
     summary="Send a button or list reply (poll or saved address)",
 )
-def trigger_interactive(body: InteractiveRequest):
+async def trigger_interactive(body: InteractiveRequest):
 
-    result = run_action(
+    result = await run_action_async(
         lambda: handle_interactive(
             sender=body.destination,
             option_id=body.option_id,

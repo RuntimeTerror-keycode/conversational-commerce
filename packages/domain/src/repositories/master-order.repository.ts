@@ -12,17 +12,18 @@ export class MasterOrderRepository {
   public async createDraft(input: MasterOrderInsert): Promise<MasterOrderRow> {
     const result = await this.db.query<MasterOrderRow>(
       `INSERT INTO master_order
-        (order_code, customer_id, address_id, status,
+        (order_code, customer_id, address_id, status, payment_mode,
          product_amount, total_amount, delivery_fee, platform_fee,
          confirmation_token, token_expires_at,
          confirmed_snapshot, cart_hash,
          delivery_note, trace_id)
-      VALUES ($1, $2, $3, 'draft', $4, $5, 0, 0, $6, $7, $8, $9, $10, $11)
+      VALUES ($1, $2, $3, 'draft', $4, $5, $6, 0, 0, $7, $8, $9, $10, $11, $12)
       RETURNING *`,
       [
         input.orderCode,
         input.customerId,
         input.addressId,
+        input.paymentMode,
         input.productAmount,
         input.totalAmount,
         input.confirmationToken,
@@ -124,20 +125,22 @@ export class MasterOrderRepository {
     const result = await this.db.query<MasterOrderRow>(
       `UPDATE master_order SET
         address_id = $2,
-        product_amount = $3,
-        total_amount = $4,
-        confirmation_token = $5,
-        token_expires_at = $6,
-        confirmed_snapshot = $7,
-        cart_hash = $8,
-        delivery_note = $9,
-        trace_id = $10,
+        payment_mode = $3,
+        product_amount = $4,
+        total_amount = $5,
+        confirmation_token = $6,
+        token_expires_at = $7,
+        confirmed_snapshot = $8,
+        cart_hash = $9,
+        delivery_note = $10,
+        trace_id = $11,
         updated_at = NOW()
       WHERE id = $1
       RETURNING *`,
       [
         orderId,
         input.addressId,
+        input.paymentMode,
         input.productAmount,
         input.totalAmount,
         input.confirmationToken,

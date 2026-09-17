@@ -7,11 +7,12 @@
 -- ============================================================
 
 CREATE TABLE customer (
-    id              SERIAL PRIMARY KEY,
-    phone           VARCHAR(20) NOT NULL UNIQUE,      -- WhatsApp number, e.g. "919847012345"
-    display_name    VARCHAR(255),
-    language        VARCHAR(50),
-    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    id                    SERIAL PRIMARY KEY,
+    phone                 VARCHAR(20) NOT NULL UNIQUE,      -- WhatsApp number, e.g. "919847012345"
+    display_name          VARCHAR(255),
+    language              VARCHAR(50),
+    default_payment_mode  VARCHAR(20),                      -- 'cod' | 'gpay' — set once the customer picks, asked per docs/contracts.md's confirmation flow
+    created_at            TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 -- ============================================================

@@ -4,13 +4,29 @@ import { RequestContext } from "@mastra/core/request-context";
 import { mastra } from "../mastra/index.js";
 import { resolveRetailer } from "../mastra/tools/resolve-retailer.js";
 import { scopeFor } from "../mastra/memory/config.js";
-import { currentSession, rotateSession } from "../mastra/memory/session-store.js";
+import { currentSession, isNewSession, rotateSession } from "../mastra/memory/session-store.js";
 import type { ShoppingContextValues } from "../mastra/context.js";
 
 const MAX_BODY_LENGTH = 1024;
 
 function truncate(text: string, maxLength: number): string {
   return text.length > maxLength ? `${text.slice(0, maxLength - 1)}…` : text;
+}
+
+/**
+ * Rare DeepSeek sampling glitch: the same sentence comes back twice in a row
+ * with no separator ("Added milk.Added milk. Anything else?"). Not a
+ * framework bug — result.text is genuinely the model's own final-step output
+ * verbatim. Collapse the longest exact repeated prefix as a safety net so it
+ * never reaches the customer looking broken.
+ */
+function collapseLeadingDuplicate(text: string): string {
+  for (let i = Math.floor(text.length / 2); i >= 20; i--) {
+    if (text.slice(0, i) === text.slice(i, 2 * i)) {
+      return text.slice(i);
+    }
+  }
+  return text;
 }
 
 function wasOrderPlaced(steps: Array<{ toolResults?: Array<{ payload: { toolName: string; result: unknown } }> }>): boolean {
@@ -28,18 +44,19 @@ export async function agentTurn(req: Request, res: Response) {
     return;
   }
 
-  const { traceId, customerRef, text } = parsed.data;
+  const { traceId, customerRef, text, source } = parsed.data;
 
   // docs/contracts.md §A1 documents a reserved `sessionHint` field for this, but it
   // isn't part of the actual AgentTurnRequest schema in packages/contracts yet, so
   // sessions are tracked agent-side for now. Only the order-placed boundary rotates
   // the thread — the 30-min idle boundary still needs sessionHint or edge tracking.
   const customerId = customerRef;
+  const isFirstTurnOfSession = isNewSession(customerId);
   const sessionId = currentSession(customerId);
   const startedAt = Date.now();
 
   try {
-    const { primary, nearby } = await resolveRetailer(customerRef);
+    const { primary, nearby, hasAddress } = await resolveRetailer(customerRef);
 
     const requestContext = new RequestContext<ShoppingContextValues>();
     requestContext.set("retailerId", primary.retailerId);
@@ -50,11 +67,16 @@ export async function agentTurn(req: Request, res: Response) {
       "nearbyShopIds",
       nearby.map((shop) => shop.retailerId),
     );
+    requestContext.set("requireAddressFirst", source === "voice" && isFirstTurnOfSession && !hasAddress);
 
     const shoppingAgent = mastra.getAgentById("shopping-agent");
     const result = await shoppingAgent.generate(text, {
       memory: scopeFor(customerId, sessionId),
       requestContext,
+      // Mastra's default (5) is too low for a turn with several items —
+      // search + updateCart per item can exceed it, forcing a truncated,
+      // empty-sounding reply once the step budget runs out mid-reasoning.
+      maxSteps: 20,
     });
 
     const toolCallNames = result.toolCalls.map((tc) => tc.payload.toolName);
@@ -68,7 +90,6 @@ export async function agentTurn(req: Request, res: Response) {
         usage: result.usage,
       }),
     );
-
     const orderPlaced = wasOrderPlaced(result.steps);
     if (orderPlaced) {
       rotateSession(customerId);
@@ -77,7 +98,7 @@ export async function agentTurn(req: Request, res: Response) {
     const response: AgentTurnResponse = {
       traceId,
       sessionState: orderPlaced ? "order_placed" : "active",
-      blocks: [{ type: "text", body: truncate(result.text, MAX_BODY_LENGTH) }],
+      blocks: [{ type: "text", body: truncate(collapseLeadingDuplicate(result.text), MAX_BODY_LENGTH) }],
     };
 
     res.status(200).json(response);

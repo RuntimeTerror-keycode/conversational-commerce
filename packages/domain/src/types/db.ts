@@ -9,10 +9,13 @@ export interface CustomerRow {
   phone: string;
   display_name: string | null;
   language: string | null;
+  default_payment_mode: string | null;
 }
 
 export interface CustomerWithAddressRow extends CustomerRow {
   address_id: number | null;
+  address_line: string | null;
+  label: string | null;
   latitude: number | null;
   longitude: number | null;
   city: string | null;
@@ -113,6 +116,7 @@ export interface MasterOrderInsert {
   orderCode: string;
   customerId: number;
   addressId: number;
+  paymentMode: string;
   productAmount: number;
   totalAmount: number;
   confirmationToken: string;

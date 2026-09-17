@@ -1,7 +1,7 @@
 from fastapi import APIRouter
 
 from app.handlers import handle_location
-from app.routers.deps import run_action
+from app.routers.deps import run_action, run_action_async
 from app.schemas import DestinationRequest, LocationTriggerRequest
 from app.services.whatsapp import send_location_request
 
@@ -13,9 +13,9 @@ router = APIRouter(tags=["Location"])
     "/location",
     summary="Send a location as if the customer shared it",
 )
-def trigger_location(body: LocationTriggerRequest):
+async def trigger_location(body: LocationTriggerRequest):
 
-    result = run_action(
+    result = await run_action_async(
         lambda: handle_location(
             sender=body.destination,
             latitude=body.latitude,
