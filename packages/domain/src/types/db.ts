@@ -29,6 +29,8 @@ export interface ShopWithLocationRow {
   id: number;
   name: string;
   is_active: boolean;
+  opening_time: string | null;
+  closing_time: string | null;
   delivery_radius_km: number | null;
   latitude: number | null;
   longitude: number | null;

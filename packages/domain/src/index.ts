@@ -6,6 +6,7 @@ export { AppError, ErrorCode } from './lib/app-error';
 export { haversineKm } from './lib/geo';
 export { generateOrderCode } from './lib/order-code';
 export { classifyMatches, formatIndianPrice, MatchClassification } from './lib/match-classification';
+export { isWithinOpeningHours } from './lib/shop-hours';
 
 // Constants
 export * from './constants';

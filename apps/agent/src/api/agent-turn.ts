@@ -1,5 +1,6 @@
 import type { Request, Response } from "express";
 import { AgentTurnRequest, type AgentTurnResponse } from "@cc/contracts";
+import { AppError } from "@cc/domain";
 import { RequestContext } from "@mastra/core/request-context";
 import { mastra } from "../mastra/index.js";
 import { resolveRetailer } from "../mastra/tools/resolve-retailer.js";
@@ -37,6 +38,25 @@ function wasOrderPlaced(steps: Array<{ toolResults?: Array<{ payload: { toolName
   );
 }
 
+/** "07:00" -> "7:00 AM", to match the friendly, non-24h tone of the other WhatsApp templates. */
+function formatTime12h(time: string): string {
+  const [h, m] = time.split(":").map(Number);
+  const period = h >= 12 ? "PM" : "AM";
+  const hour12 = h % 12 === 0 ? 12 : h % 12;
+  return `${hour12}:${String(m).padStart(2, "0")} ${period}`;
+}
+
+function shopClosedMessage(nextOpeningTime: string | null): string {
+  return [
+    "🌙 *Store Closed*",
+    "We're not taking orders right now — outside business hours.",
+    "",
+    nextOpeningTime ? `⏰ We reopen at *${formatTime12h(nextOpeningTime)}*.` : "Please try again once we reopen.",
+    "",
+    "Thanks for your patience! 🙏",
+  ].join("\n");
+}
+
 export async function agentTurn(req: Request, res: Response) {
   const parsed = AgentTurnRequest.safeParse(req.body);
   if (!parsed.success) {
@@ -55,8 +75,44 @@ export async function agentTurn(req: Request, res: Response) {
   const sessionId = currentSession(customerId);
   const startedAt = Date.now();
 
+  let resolved: Awaited<ReturnType<typeof resolveRetailer>>;
   try {
-    const { primary, nearby, hasAddress } = await resolveRetailer(customerRef);
+    resolved = await resolveRetailer(customerRef);
+  } catch (error) {
+    // Gated in code, not left to the model: a closed shop must reject every
+    // order attempt regardless of what the customer says, so this is
+    // answered deterministically before the agent (or any LLM call) even
+    // runs — the reply is identical no matter how the request is phrased.
+    if (error instanceof AppError && /closed right now/i.test(error.message)) {
+      const nextOpeningTime = (error.details?.nextOpeningTime as string | null | undefined) ?? null;
+      res.status(200).json({
+        traceId,
+        sessionState: "active",
+        blocks: [{ type: "text", body: shopClosedMessage(nextOpeningTime) }],
+      } satisfies AgentTurnResponse);
+      return;
+    }
+
+    console.error(
+      JSON.stringify({
+        traceId,
+        customerId,
+        agent: "shopping",
+        event: "agent_turn_error",
+        latencyMs: Date.now() - startedAt,
+        error: error instanceof Error ? error.message : String(error),
+      }),
+    );
+    res.status(200).json({
+      traceId,
+      sessionState: "active",
+      blocks: [{ type: "text", body: "Something went wrong, please try again in a moment." }],
+    } satisfies AgentTurnResponse);
+    return;
+  }
+
+  try {
+    const { primary, nearby, hasAddress } = resolved;
 
     const requestContext = new RequestContext<ShoppingContextValues>();
     requestContext.set("retailerId", primary.retailerId);
