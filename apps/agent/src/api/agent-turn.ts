@@ -29,7 +29,6 @@ export async function agentTurn(req: Request, res: Response) {
   }
 
   const { traceId, customerRef, text } = parsed.data;
-  const { retailerId, name: retailerName, area } = resolveRetailer(customerRef);
 
   // docs/contracts.md §A1 documents a reserved `sessionHint` field for this, but it
   // isn't part of the actual AgentTurnRequest schema in packages/contracts yet, so
@@ -37,16 +36,21 @@ export async function agentTurn(req: Request, res: Response) {
   // the thread — the 30-min idle boundary still needs sessionHint or edge tracking.
   const customerId = customerRef;
   const sessionId = currentSession(customerId);
-
-  const requestContext = new RequestContext<ShoppingContextValues>();
-  requestContext.set("retailerId", retailerId);
-  requestContext.set("customerId", customerId);
-  requestContext.set("retailerName", retailerName);
-  requestContext.set("area", area);
-
   const startedAt = Date.now();
 
   try {
+    const { primary, nearby } = await resolveRetailer(customerRef);
+
+    const requestContext = new RequestContext<ShoppingContextValues>();
+    requestContext.set("retailerId", primary.retailerId);
+    requestContext.set("customerId", customerId);
+    requestContext.set("retailerName", primary.name);
+    requestContext.set("area", primary.area);
+    requestContext.set(
+      "nearbyShopIds",
+      nearby.map((shop) => shop.retailerId),
+    );
+
     const shoppingAgent = mastra.getAgentById("shopping-agent");
     const result = await shoppingAgent.generate(text, {
       memory: scopeFor(customerId, sessionId),

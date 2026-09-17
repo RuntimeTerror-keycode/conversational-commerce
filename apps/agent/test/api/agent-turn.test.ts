@@ -6,6 +6,7 @@ import request from "supertest";
 import { AgentTurnResponse } from "@cc/contracts";
 
 const generateMock = vi.fn();
+const resolveMock = vi.fn();
 
 vi.mock("../../src/mastra/index.js", () => ({
   mastra: {
@@ -19,7 +20,15 @@ vi.mock("../../src/mastra/memory/config.js", () => ({
   scopeFor: (customerId: string, sessionId: string) => ({ resource: `customer:${customerId}`, thread: `session:${sessionId}` }),
 }));
 
+const { setServices } = await import("../../src/lib/services.js");
 const { createServer } = await import("../../src/server.js");
+
+setServices({
+  retailer: { resolve: resolveMock },
+  catalog: {},
+  cart: {},
+  orders: {},
+} as never);
 
 function fixtureRequest(overrides: Partial<Record<string, unknown>> = {}) {
   return {
@@ -35,6 +44,14 @@ function fixtureRequest(overrides: Partial<Record<string, unknown>> = {}) {
 
 beforeEach(() => {
   generateMock.mockReset();
+  resolveMock.mockReset();
+  resolveMock.mockResolvedValue({
+    primary: { retailerId: "1", name: "Krishna Supermart", area: "Kochi" },
+    nearby: [
+      { retailerId: "1", name: "Krishna Supermart", distanceKm: 2.1 },
+      { retailerId: "2", name: "Maveli Stores", distanceKm: 3.7 },
+    ],
+  });
 });
 
 describe("POST /agent/turn", () => {

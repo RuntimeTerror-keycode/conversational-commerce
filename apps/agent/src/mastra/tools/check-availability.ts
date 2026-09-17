@@ -1,7 +1,8 @@
-// STUB — replace with domain.checkAvailability(retailerId, productIds) per
-// docs/contracts.md §C1 once packages/domain exists.
 import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
+import { getServices } from "../../lib/services.js";
+import { readShoppingContext } from "../context.js";
+import { asValue } from "./errors.js";
 
 const Substitute = z.object({
   id: z.string(),
@@ -10,29 +11,24 @@ const Substitute = z.object({
   price: z.number(),
 });
 
-// Hardcoded: p_601 (Chicken 1kg) is out of stock with one substitute.
-const OUT_OF_STOCK: Record<string, z.infer<typeof Substitute>[]> = {
-  p_601: [{ id: "p_602", name: "Chicken (frozen) 1kg", unit: "1kg", price: 195 }],
-};
-
 export const checkAvailability = createTool({
   id: "checkAvailability",
-  description: "Check current stock for a list of product ids, with substitutes for anything out of stock.",
+  description:
+    "Look up substitutes for products this shop cannot supply. Use it after an add is rejected, not to decide whether an order can go ahead.",
   inputSchema: z.object({ productIds: z.array(z.string()) }),
-  outputSchema: z.object({
-    results: z.array(
-      z.object({
-        productId: z.string(),
-        inStock: z.boolean(),
-        substitutes: z.array(Substitute),
-      }),
-    ),
-  }),
-  execute: async ({ productIds }) => {
-    const results = productIds.map((productId) => {
-      const substitutes = OUT_OF_STOCK[productId];
-      return { productId, inStock: !substitutes, substitutes: substitutes ?? [] };
+  outputSchema: z.union([
+    z.object({
+      results: z.array(
+        z.object({ productId: z.string(), inStock: z.boolean(), substitutes: z.array(Substitute) }),
+      ),
+    }),
+    z.object({ error: z.literal(true), reason: z.string() }),
+  ]),
+  execute: async ({ productIds }, context) => {
+    const { retailerId } = readShoppingContext(context.requestContext);
+    return asValue(async () => {
+      const results = await getServices().catalog.checkAvailability(retailerId, productIds);
+      return { results };
     });
-    return { results };
   },
 });

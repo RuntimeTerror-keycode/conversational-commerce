@@ -1,10 +1,10 @@
-// STUB — replace with domain.createOrder per docs/contracts.md §C1 once
-// packages/domain exists. The token gate below is real, not a stub: rejecting
-// without a valid confirmationToken is a non-negotiable rule, enforced here
-// regardless of what the model intends (CLAUDE.md rule 3).
+// The token gate is real, not a stub: rejecting without a valid
+// confirmationToken is non-negotiable (CLAUDE.md rule 3). The domain layer
+// enforces it and returns failures as values, so no mapping is needed here.
 import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
-import { consumeConfirmationToken } from "./confirmation-store.js";
+import { getServices } from "../../lib/services.js";
+import { asValue } from "./errors.js";
 
 export const placeOrder = createTool({
   id: "placeOrder",
@@ -16,13 +16,8 @@ export const placeOrder = createTool({
   }),
   outputSchema: z.union([
     z.object({ orderId: z.string(), status: z.literal("placed"), etaMinutes: z.number() }),
-    z.object({ error: z.literal(true), reason: z.enum(["not_found", "expired"]) }),
+    z.object({ error: z.literal(true), reason: z.string() }),
   ]),
-  execute: async ({ confirmationToken }) => {
-    const result = consumeConfirmationToken(confirmationToken);
-    if (!result.ok) {
-      return { error: true as const, reason: result.reason };
-    }
-    return { orderId: `ord_${crypto.randomUUID()}`, status: "placed" as const, etaMinutes: 45 };
-  },
+  execute: async ({ confirmationToken, deliveryNote }) =>
+    asValue(() => getServices().orders.createOrder(confirmationToken, { deliveryNote })),
 });

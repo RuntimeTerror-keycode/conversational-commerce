@@ -1,12 +1,8 @@
-// STUB — replace with domain.resolveRetailer(customerRef) per
-// docs/contracts.md §C1 once packages/domain exists. Not a Mastra tool (not
-// model-facing) — called from agent-turn.ts before invoking the agent.
-export type ResolvedRetailer = {
-  retailerId: string;
-  name: string;
-  area: string;
-};
+// Not a Mastra tool (not model-facing) — called from agent-turn.ts before
+// invoking the agent, to populate RequestContext.
+import { getServices } from "../../lib/services.js";
+import type { ResolveRetailerResponse } from "@cc/domain";
 
-export function resolveRetailer(_customerRef: string): ResolvedRetailer {
-  return { retailerId: "retailer_demo", name: "Demo Store", area: "Kochi" };
+export function resolveRetailer(customerRef: string): Promise<ResolveRetailerResponse> {
+  return getServices().retailer.resolve(customerRef);
 }

@@ -5,12 +5,17 @@ import type { RequestContext } from "@mastra/core/request-context";
  * Never model-supplied — retailerId/customerId always come from here, per
  * CLAUDE.md's "all tools receive retailerId and customerId from run context,
  * never from the model."
+ *
+ * retailerId is the primary shop: the pricing and search lens, not cart
+ * ownership. nearbyShopIds is the full delivery-radius list the splitting
+ * algorithm considers at confirmation.
  */
 export type ShoppingContextValues = {
   retailerId: string;
   customerId: string;
   retailerName: string;
   area: string;
+  nearbyShopIds: string[];
 };
 
 export type ShoppingRequestContext = RequestContext<ShoppingContextValues>;
@@ -22,5 +27,6 @@ export function readShoppingContext(requestContext: unknown): ShoppingContextVal
     customerId: ctx.get("customerId"),
     retailerName: ctx.get("retailerName"),
     area: ctx.get("area"),
+    nearbyShopIds: ctx.get("nearbyShopIds") ?? [],
   };
 }
