@@ -31,19 +31,11 @@ export interface HealthResponse {
 // Errors
 // ---------------------------------------------------------------------------
 
-export type ErrorCode =
-  | 'bad_request'
-  | 'unauthorized'
-  | 'forbidden'
-  | 'not_found'
-  | 'conflict'
-  | 'validation_failed'
-  | 'rate_limited'
-  | 'internal_error';
+export { ErrorCode } from '@cc/domain';
 
 export interface ErrorResponse {
   status: 'error';
-  code: ErrorCode;
+  code: string;
   message: string;
   details?: Record<string, unknown>;
   stack?: string;
@@ -67,10 +59,9 @@ export interface PaginatedResponse<T> {
 }
 
 // ---------------------------------------------------------------------------
-// Domain re-exports
+// Feature-specific types
 // ---------------------------------------------------------------------------
 
 export * from './identify.types';
 export * from './fulfillment.types';
 export * from './inventory.types';
-export * from './domain.types';

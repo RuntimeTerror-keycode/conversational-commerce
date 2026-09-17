@@ -1,42 +1,13 @@
-import { Database } from '../lib/db';
 import { PoolClient } from 'pg';
-
-// ---------------------------------------------------------------------------
-// Row types
-// ---------------------------------------------------------------------------
-
-export interface CartRow {
-  id: number;
-  customer_id: number;
-}
-
-export interface CartItemRow {
-  id: number;
-  cart_id: number;
-  catalog_id: number;
-  quantity: number;
-}
-
-export interface CartItemDetailRow {
-  line_id: number;
-  catalog_id: number;
-  product_name: string;
-  quantity: number;
-  unit: string;
-}
-
-// ---------------------------------------------------------------------------
-// Repository — primary tables: cart, cart_item
-// ---------------------------------------------------------------------------
+import { IDatabase, CartRow, CartItemRow, CartItemDetailRow } from '../types';
 
 export class CartRepository {
-  private readonly db: Database;
+  private readonly db: IDatabase;
 
-  constructor(db: Database) {
+  constructor(db: IDatabase) {
     this.db = db;
   }
 
-  /** Find existing cart or create one for this customer. Returns cart id. */
   public async findOrCreate(customerId: number): Promise<number> {
     const existing = await this.db.query<CartRow>(
       'SELECT id, customer_id FROM cart WHERE customer_id = $1',
@@ -54,7 +25,6 @@ export class CartRepository {
     return created.rows[0].id;
   }
 
-  /** Get all items in a cart with catalog info. */
   public async findItems(cartId: number): Promise<CartItemDetailRow[]> {
     const result = await this.db.query<CartItemDetailRow>(
       `SELECT
@@ -72,7 +42,6 @@ export class CartRepository {
     return result.rows;
   }
 
-  /** Find a cart item by cart + catalog id. */
   public async findItemByCatalog(cartId: number, catalogId: number): Promise<CartItemRow | null> {
     const result = await this.db.query<CartItemRow>(
       'SELECT id, cart_id, catalog_id, quantity FROM cart_item WHERE cart_id = $1 AND catalog_id = $2',
@@ -112,7 +81,6 @@ export class CartRepository {
     await this.db.query('UPDATE cart SET updated_at = NOW() WHERE id = $1', [cartId]);
   }
 
-  /** Delete all items within a transaction (used during order placement). */
   public async clearCartTx(client: PoolClient, cartId: number): Promise<void> {
     await client.query('DELETE FROM cart_item WHERE cart_id = $1', [cartId]);
   }

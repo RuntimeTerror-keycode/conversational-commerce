@@ -1,9 +1,18 @@
-import { randomBytes } from 'crypto';
+import { createHash, randomBytes } from 'crypto';
 import { PoolClient } from 'pg';
 
 import { AppError } from '../lib/app-error';
-import { Database } from '../lib/db';
-import { Logger } from '../logger/logger';
+import {
+  IDatabase,
+  ILogger,
+  CartItemDetailRow,
+  OrderConfirmationResponse,
+  CreateOrderResponse,
+  DomainCartLine,
+  ShopBreakdownEntry,
+  ConfirmedSnapshot,
+  SnapshotAssignment,
+} from '../types';
 import { CartRepository } from '../repositories/cart.repository';
 import { CustomerRepository } from '../repositories/customer.repository';
 import { FulfillmentRepository } from '../repositories/fulfillment.repository';
@@ -12,38 +21,10 @@ import { OrderEventRepository } from '../repositories/order-event.repository';
 import { OrderItemRepository } from '../repositories/order-item.repository';
 import { ShopRepository } from '../repositories/shop.repository';
 import {
-  OrderConfirmationResponse,
-  CreateOrderResponse,
-  DomainCartLine,
-  ShopBreakdownEntry,
-} from '../types';
-import {
   confirmationTokenTtlMinutes,
   defaultEtaMinutes,
   minFulfillmentAmount,
 } from '../constants';
-
-// ---------------------------------------------------------------------------
-// Internal types
-// ---------------------------------------------------------------------------
-
-interface CartSnapshot {
-  catalogId: number;
-  productName: string;
-  quantity: number;
-  unit: string;
-}
-
-interface ShopAssignment {
-  shopId: number;
-  shopName: string;
-  items: (CartSnapshot & { shopProductId: number; unitPrice: number })[];
-  subtotal: number;
-}
-
-// ---------------------------------------------------------------------------
-// Service
-// ---------------------------------------------------------------------------
 
 export class OrderPlacementService {
   private readonly cartRepo: CartRepository;
@@ -53,8 +34,8 @@ export class OrderPlacementService {
   private readonly fulfillmentRepo: FulfillmentRepository;
   private readonly orderItemRepo: OrderItemRepository;
   private readonly orderEventRepo: OrderEventRepository;
-  private readonly db: Database;
-  private readonly logger: Logger;
+  private readonly db: IDatabase;
+  private readonly logger: ILogger;
 
   constructor(deps: {
     cartRepo: CartRepository;
@@ -64,8 +45,8 @@ export class OrderPlacementService {
     fulfillmentRepo: FulfillmentRepository;
     orderItemRepo: OrderItemRepository;
     orderEventRepo: OrderEventRepository;
-    db: Database;
-    logger: Logger;
+    db: IDatabase;
+    logger: ILogger;
   }) {
     this.cartRepo = deps.cartRepo;
     this.customerRepo = deps.customerRepo;
@@ -79,8 +60,8 @@ export class OrderPlacementService {
   }
 
   /**
-   * Snapshot the cart, run the splitting algorithm, and return a
-   * confirmation token. Creates a draft master_order.
+   * Snapshot the cart, run the splitting algorithm, persist the
+   * snapshot on the draft order, and return a confirmation token.
    */
   public async requestConfirmation(
     customerId: string,
@@ -111,6 +92,17 @@ export class OrderPlacementService {
     const addressId = customerAddress?.address_id ?? 0;
 
     const orderCode = this.generateOrderCode();
+    const cartHash = this.computeCartHash(cartItems);
+
+    const snapshot: ConfirmedSnapshot = {
+      assignments: assignments.map((a) => ({
+        shopId: a.shopId,
+        shopName: a.shopName,
+        items: a.items,
+        subtotal: a.subtotal,
+      })),
+      nearbyShopIds: shopIds,
+    };
 
     await this.masterOrderRepo.createDraft({
       orderCode,
@@ -120,6 +112,8 @@ export class OrderPlacementService {
       totalAmount,
       confirmationToken: token,
       tokenExpiresAt: expiresAt,
+      confirmedSnapshot: snapshot,
+      cartHash,
     });
 
     const summary = this.buildSummaryLines(assignments);
@@ -142,8 +136,8 @@ export class OrderPlacementService {
   }
 
   /**
-   * Consume the confirmation token, create fulfillments + order items,
-   * and clear the cart.
+   * Consume the confirmation token and place the order using the
+   * persisted snapshot — NOT by re-reading the live cart.
    */
   public async createOrder(
     confirmationToken: string,
@@ -160,26 +154,22 @@ export class OrderPlacementService {
     }
 
     const cartId = await this.cartRepo.findOrCreate(order.customer_id);
-    const cartItems = await this.cartRepo.findItems(cartId);
+    const liveCartItems = await this.cartRepo.findItems(cartId);
+    const liveHash = this.computeCartHash(liveCartItems);
 
-    if (cartItems.length === 0) {
+    if (liveHash !== order.cart_hash) {
       return { error: true, reason: 'cart_changed' };
     }
 
-    // Re-resolve nearby shops from all active shops to re-split
-    const allShops = await this.shopRepo.findAllActiveWithLocation();
-    const shopIds = allShops.map((s) => s.id);
-
-    const assignments = await this.splitAcrossShops(cartItems, shopIds);
-
-    if (assignments.length === 0) {
-      return { error: true, reason: 'cart_changed' };
+    const snapshot = order.confirmed_snapshot;
+    if (!snapshot || !snapshot.assignments || snapshot.assignments.length === 0) {
+      return { error: true, reason: 'not_found' };
     }
 
     await this.db.transaction(async (client: PoolClient) => {
       await this.masterOrderRepo.placeTx(client, order.id, opts?.deliveryNote);
 
-      for (const assignment of assignments) {
+      for (const assignment of snapshot.assignments) {
         const fulfillmentId = await this.fulfillmentRepo.insertTx(
           client,
           order.id,
@@ -209,10 +199,14 @@ export class OrderPlacementService {
       await this.cartRepo.clearCartTx(client, cartId);
     });
 
+    // TODO: POST /notify to edge service — notify customer that order is placed.
+    // Deferred — see docs/agent-domain-contract.md open question 3.
+    // apps/api owns this call (from inside transitionOrder), not the AI service.
+
     this.logger.info('Order placed', {
       orderId: order.id,
       orderCode: order.order_code,
-      fulfillmentCount: assignments.length,
+      fulfillmentCount: snapshot.assignments.length,
     });
 
     return {
@@ -226,15 +220,10 @@ export class OrderPlacementService {
   // Splitting algorithm
   // -----------------------------------------------------------------------
 
-  /**
-   * Greedy set-cover: assign cart items to shops, minimizing shop count
-   * and avoiding fulfillments below the minimum amount.
-   */
   private async splitAcrossShops(
-    cartItems: { line_id: number; catalog_id: number; product_name: string; quantity: number; unit: string }[],
+    cartItems: CartItemDetailRow[],
     shopIds: number[],
-  ): Promise<ShopAssignment[]> {
-    // Build a map: catalogId → list of { shopId, shopProductId, unitPrice }
+  ): Promise<SnapshotAssignment[]> {
     const catalogIds = [...new Set(cartItems.map((i) => i.catalog_id))];
     const availability = await this.loadAvailability(catalogIds, shopIds);
 
@@ -244,11 +233,9 @@ export class OrderPlacementService {
       shopNames.set(shop.id, shop.name);
     }
 
-    // Track which items are unassigned
     const unassigned = new Set(cartItems.map((_, idx) => idx));
-    const assignments = new Map<number, ShopAssignment>();
+    const assignments = new Map<number, SnapshotAssignment>();
 
-    // Greedy: pick the shop that covers the most unassigned items
     while (unassigned.size > 0) {
       let bestShopId = -1;
       let bestCoverage: number[] = [];
@@ -268,9 +255,9 @@ export class OrderPlacementService {
         }
       }
 
-      if (bestShopId === -1) break; // remaining items unavailable at any shop
+      if (bestShopId === -1) break;
 
-      const assignment: ShopAssignment = assignments.get(bestShopId) ?? {
+      const assignment: SnapshotAssignment = assignments.get(bestShopId) ?? {
         shopId: bestShopId,
         shopName: shopNames.get(bestShopId) ?? 'Unknown',
         items: [],
@@ -298,20 +285,15 @@ export class OrderPlacementService {
       assignments.set(bestShopId, assignment);
     }
 
-    // Rebalance: move items from small fulfillments to larger ones if possible
     return this.rebalance([...assignments.values()], availability);
   }
 
-  /**
-   * If a shop's fulfillment is below the minimum amount, try to
-   * reassign its items to another shop that also carries them.
-   */
   private rebalance(
-    assignments: ShopAssignment[],
+    assignments: SnapshotAssignment[],
     availability: Map<number, { shopId: number; shopProductId: number; unitPrice: number }[]>,
-  ): ShopAssignment[] {
-    const large: ShopAssignment[] = [];
-    const small: ShopAssignment[] = [];
+  ): SnapshotAssignment[] {
+    const large: SnapshotAssignment[] = [];
+    const small: SnapshotAssignment[] = [];
 
     for (const a of assignments) {
       if (a.subtotal >= minFulfillmentAmount) {
@@ -340,7 +322,6 @@ export class OrderPlacementService {
       }
 
       if (!fullyReassigned) {
-        // Keep the small assignment — some items can only come from here
         large.push(sa);
       }
     }
@@ -348,7 +329,6 @@ export class OrderPlacementService {
     return large.filter((a) => a.items.length > 0);
   }
 
-  /** Load shop_product availability for the given catalog items across shops. */
   private async loadAvailability(
     catalogIds: number[],
     shopIds: number[],
@@ -383,7 +363,14 @@ export class OrderPlacementService {
     return map;
   }
 
-  private buildSummaryLines(assignments: ShopAssignment[]): DomainCartLine[] {
+  private computeCartHash(items: CartItemDetailRow[]): string {
+    const sorted = [...items]
+      .sort((a, b) => a.catalog_id - b.catalog_id)
+      .map((i) => `${i.catalog_id}:${i.quantity}`);
+    return createHash('sha256').update(sorted.join('|')).digest('hex').slice(0, 16);
+  }
+
+  private buildSummaryLines(assignments: SnapshotAssignment[]): DomainCartLine[] {
     const lines: DomainCartLine[] = [];
     for (const a of assignments) {
       for (const item of a.items) {
@@ -399,7 +386,7 @@ export class OrderPlacementService {
     return lines;
   }
 
-  private buildBreakdown(assignments: ShopAssignment[]): ShopBreakdownEntry[] {
+  private buildBreakdown(assignments: SnapshotAssignment[]): ShopBreakdownEntry[] {
     return assignments.map((a) => ({
       shopId: String(a.shopId),
       shopName: a.shopName,

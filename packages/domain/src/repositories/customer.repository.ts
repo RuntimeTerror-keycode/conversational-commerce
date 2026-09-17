@@ -1,31 +1,10 @@
-import { Database } from '../lib/db';
-
-// ---------------------------------------------------------------------------
-// Row types
-// ---------------------------------------------------------------------------
-
-export interface CustomerRow {
-  id: number;
-  phone: string;
-  display_name: string | null;
-  language: string | null;
-}
-
-export interface CustomerWithAddressRow extends CustomerRow {
-  address_id: number | null;
-  latitude: number | null;
-  longitude: number | null;
-  city: string | null;
-}
-
-// ---------------------------------------------------------------------------
-// Repository — primary table: customer
-// ---------------------------------------------------------------------------
+import { IDatabase } from '../types';
+import { CustomerRow, CustomerWithAddressRow } from '../types';
 
 export class CustomerRepository {
-  private readonly db: Database;
+  private readonly db: IDatabase;
 
-  constructor(db: Database) {
+  constructor(db: IDatabase) {
     this.db = db;
   }
 

@@ -1,39 +1,10 @@
 import { PoolClient } from 'pg';
-
-import { Database } from '../lib/db';
-
-// ---------------------------------------------------------------------------
-// Row types
-// ---------------------------------------------------------------------------
-
-export interface OrderItemRow {
-  lineId: number;
-  shopProductId: number;
-  productName: string;
-  catalogName: string;
-  quantity: number;
-  unit: string;
-  unitPrice: string;
-  lineTotal: string;
-}
-
-export interface OrderItemPriceRow {
-  id: number;
-  unit_price: string;
-}
-
-export interface OrderItemQuantityRow {
-  quantity: number;
-}
-
-// ---------------------------------------------------------------------------
-// Repository — primary table: order_item
-// ---------------------------------------------------------------------------
+import { IDatabase, OrderItemRow, OrderItemPriceRow, OrderItemQuantityRow } from '../types';
 
 export class OrderItemRepository {
-  private readonly db: Database;
+  private readonly db: IDatabase;
 
-  constructor(db: Database) {
+  constructor(db: IDatabase) {
     this.db = db;
   }
 
@@ -86,7 +57,6 @@ export class OrderItemRepository {
     );
   }
 
-  /** Batch insert order items within a transaction (order placement). */
   public async insertBatchTx(
     client: PoolClient,
     items: { fulfillmentId: number; shopProductId: number; quantity: number; unitPrice: number }[],

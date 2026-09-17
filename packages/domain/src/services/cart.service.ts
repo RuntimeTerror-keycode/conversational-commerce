@@ -1,15 +1,10 @@
 import { AppError } from '../lib/app-error';
-import { Logger } from '../logger/logger';
+import { ILogger, DomainCart, DomainCartLine, CartOpInput } from '../types';
 import { CartRepository } from '../repositories/cart.repository';
 import { CatalogRepository } from '../repositories/catalog.repository';
 import { CustomerRepository } from '../repositories/customer.repository';
 import { ShopProductRepository } from '../repositories/shop-product.repository';
 import { RetailerResolveService } from './retailer-resolve.service';
-import { DomainCart, DomainCartLine, CartOpInput } from '../types';
-
-// ---------------------------------------------------------------------------
-// Service
-// ---------------------------------------------------------------------------
 
 export class CartService {
   private readonly cartRepo: CartRepository;
@@ -17,7 +12,7 @@ export class CartService {
   private readonly customerRepo: CustomerRepository;
   private readonly shopProductRepo: ShopProductRepository;
   private readonly retailerService: RetailerResolveService;
-  private readonly logger: Logger;
+  private readonly logger: ILogger;
 
   constructor(
     cartRepo: CartRepository,
@@ -25,7 +20,7 @@ export class CartService {
     customerRepo: CustomerRepository,
     shopProductRepo: ShopProductRepository,
     retailerService: RetailerResolveService,
-    logger: Logger,
+    logger: ILogger,
   ) {
     this.cartRepo = cartRepo;
     this.catalogRepo = catalogRepo;
@@ -35,7 +30,6 @@ export class CartService {
     this.logger = logger.child('CartService');
   }
 
-  /** Read the current cart for a customer. Prices come from nearest available shop. */
   public async getCart(customerId: string): Promise<DomainCart> {
     const customer = await this.customerRepo.findByPhone(customerId);
     if (!customer) {
@@ -53,10 +47,10 @@ export class CartService {
       items: lines,
       total: Math.round(total * 100) / 100,
       currency: 'INR',
+      priceNote: 'Prices are indicative (cheapest nearby). Final price confirmed at checkout.',
     };
   }
 
-  /** Apply an add/remove/set operation and return the full updated cart. */
   public async mutateCart(customerId: string, op: CartOpInput): Promise<DomainCart> {
     const customer = await this.customerRepo.findByPhone(customerId);
     if (!customer) {
@@ -126,9 +120,6 @@ export class CartService {
     return this.getCart(customerId);
   }
 
-  /**
-   * Build cart lines with indicative prices from nearest available shop.
-   */
   private async buildCartLines(
     items: { line_id: number; catalog_id: number; product_name: string; quantity: number; unit: string }[],
     nearbyShopIds: number[],
@@ -147,7 +138,6 @@ export class CartService {
     }));
   }
 
-  /** Get cheapest selling price per catalog item across the given shops. */
   private async getCheapestPrices(
     catalogIds: number[],
     shopIds: number[],

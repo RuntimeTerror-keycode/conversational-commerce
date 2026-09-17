@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 
-import { OrderPlacementService } from '../services/order-placement.service';
+import { OrderPlacementService } from '@cc/domain';
 
 export class OrderController {
   private readonly service: OrderPlacementService;

@@ -1,31 +1,12 @@
-import { Database } from '../lib/db';
-
-// ---------------------------------------------------------------------------
-// Row types
-// ---------------------------------------------------------------------------
-
-export interface ShopWithLocationRow {
-  id: number;
-  name: string;
-  is_active: boolean;
-  delivery_radius_km: number | null;
-  latitude: number | null;
-  longitude: number | null;
-  city: string | null;
-}
-
-// ---------------------------------------------------------------------------
-// Repository — primary table: shop
-// ---------------------------------------------------------------------------
+import { IDatabase, ShopWithLocationRow } from '../types';
 
 export class ShopRepository {
-  private readonly db: Database;
+  private readonly db: IDatabase;
 
-  constructor(db: Database) {
+  constructor(db: IDatabase) {
     this.db = db;
   }
 
-  /** All active shops with their geocoded address. */
   public async findAllActiveWithLocation(): Promise<ShopWithLocationRow[]> {
     const result = await this.db.query<ShopWithLocationRow>(
       `SELECT

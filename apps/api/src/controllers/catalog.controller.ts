@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 
-import { CatalogSearchService } from '../services/catalog-search.service';
+import { CatalogSearchService } from '@cc/domain';
 
 export class CatalogController {
   private readonly service: CatalogSearchService;

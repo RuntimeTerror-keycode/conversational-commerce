@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 
-import { CartService } from '../services/cart.service';
+import { CartService } from '@cc/domain';
 
 export class CartController {
   private readonly service: CartService;

@@ -1,6 +1,5 @@
-import { AppError } from '../lib/app-error';
+import { AppError, ShopProductRepository } from '@cc/domain';
 import { Logger } from '../logger/logger';
-import { ShopProductRepository } from '../repositories/shop-product.repository';
 import { ProductSummary, InventoryListResponse, InventoryUpdateInput } from '../types';
 
 // ---------------------------------------------------------------------------

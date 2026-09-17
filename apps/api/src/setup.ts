@@ -3,25 +3,34 @@ import { Logger } from './logger/logger';
 import { Database } from './lib/db';
 import { MessageBroker } from './lib/rabbitmq';
 
-import { ShopUserRepository } from './repositories/shop-user.repository';
-import { FulfillmentRepository } from './repositories/fulfillment.repository';
-import { OrderItemRepository } from './repositories/order-item.repository';
-import { OrderEventRepository } from './repositories/order-event.repository';
-import { ShopProductRepository } from './repositories/shop-product.repository';
-import { CustomerRepository } from './repositories/customer.repository';
-import { ShopRepository } from './repositories/shop.repository';
-import { CatalogRepository } from './repositories/catalog.repository';
-import { CartRepository } from './repositories/cart.repository';
-import { MasterOrderRepository } from './repositories/master-order.repository';
+// Repositories — all from domain
+import {
+  ShopUserRepository,
+  FulfillmentRepository,
+  OrderItemRepository,
+  OrderEventRepository,
+  ShopProductRepository,
+  CustomerRepository,
+  ShopRepository,
+  CatalogRepository,
+  CartRepository,
+  MasterOrderRepository,
+} from '@cc/domain';
 
+// Dashboard services — stay in apps/api
 import { IdentifyService } from './services/identify.service';
 import { FulfillmentService } from './services/fulfillment.service';
 import { InventoryService } from './services/inventory.service';
-import { RetailerResolveService } from './services/retailer-resolve.service';
-import { CatalogSearchService } from './services/catalog-search.service';
-import { CartService } from './services/cart.service';
-import { OrderPlacementService } from './services/order-placement.service';
 
+// Domain services — from domain
+import {
+  RetailerResolveService,
+  CatalogSearchService,
+  CartService,
+  OrderPlacementService,
+} from '@cc/domain';
+
+// Controllers
 import { HealthController } from './controllers/health.controller';
 import { IdentifyController } from './controllers/identify.controller';
 import { FulfillmentController } from './controllers/fulfillment.controller';
@@ -31,6 +40,7 @@ import { CatalogController } from './controllers/catalog.controller';
 import { CartController } from './controllers/cart.controller';
 import { OrderController } from './controllers/order.controller';
 
+// Middlewares
 import { RequestLogger } from './middlewares/request-logger.middleware';
 import { CorsMiddleware } from './middlewares/cors.middleware';
 import { ShopContextMiddleware } from './middlewares/shop-context.middleware';
@@ -72,7 +82,7 @@ export class Setup {
     const db = new Database(config.values.databaseUrl, logger);
     const broker = new MessageBroker(config.values.rabbitmqUrl, logger);
 
-    // Repositories (one per table)
+    // Repositories (all from @cc/domain, take IDatabase)
     const shopUserRepo = new ShopUserRepository(db);
     const fulfillmentRepo = new FulfillmentRepository(db);
     const orderItemRepo = new OrderItemRepository(db);
@@ -91,7 +101,7 @@ export class Setup {
     );
     const inventoryService = new InventoryService(shopProductRepo, logger);
 
-    // Agent-facing services
+    // Agent-facing services (from @cc/domain, take ILogger)
     const retailerService = new RetailerResolveService(customerRepo, shopRepo, logger);
     const catalogService = new CatalogSearchService(catalogRepo, retailerService, logger);
     const cartService = new CartService(

@@ -8,10 +8,6 @@ export interface NearbyShop {
   distanceKm: number;
 }
 
-export interface ResolveRetailerRequest {
-  customerRef: string;
-}
-
 export interface ResolveRetailerResponse {
   primary: { retailerId: string; name: string; area: string };
   nearby: NearbyShop[];
@@ -20,12 +16,6 @@ export interface ResolveRetailerResponse {
 // ---------------------------------------------------------------------------
 // searchProducts
 // ---------------------------------------------------------------------------
-
-export interface SearchProductsRequest {
-  customerId: string;
-  query: string;
-  opts?: { attributes?: Record<string, string>; limit?: number };
-}
 
 export interface DomainProduct {
   id: string;
@@ -39,11 +29,6 @@ export interface DomainProduct {
 // ---------------------------------------------------------------------------
 // checkAvailability
 // ---------------------------------------------------------------------------
-
-export interface CheckAvailabilityRequest {
-  retailerId: string;
-  productIds: string[];
-}
 
 export interface AvailabilitySubstitute {
   id: string;
@@ -74,6 +59,7 @@ export interface DomainCart {
   items: DomainCartLine[];
   total: number;
   currency: 'INR';
+  priceNote: string;
 }
 
 export interface CartOpInput {
@@ -83,23 +69,9 @@ export interface CartOpInput {
   unit: string;
 }
 
-export interface GetCartRequest {
-  customerId: string;
-}
-
-export interface MutateCartRequest {
-  customerId: string;
-  op: CartOpInput;
-}
-
 // ---------------------------------------------------------------------------
 // Order confirmation
 // ---------------------------------------------------------------------------
-
-export interface RequestConfirmationRequest {
-  customerId: string;
-  nearbyShopIds: string[];
-}
 
 export interface ShopBreakdownEntry {
   shopId: string;
@@ -120,11 +92,6 @@ export interface OrderConfirmationResponse {
 // createOrder
 // ---------------------------------------------------------------------------
 
-export interface CreateOrderRequest {
-  confirmationToken: string;
-  opts?: { deliveryNote?: string };
-}
-
 export type CreateOrderSuccess = {
   orderId: string;
   status: 'placed';
@@ -137,3 +104,28 @@ export type CreateOrderFailure = {
 };
 
 export type CreateOrderResponse = CreateOrderSuccess | CreateOrderFailure;
+
+// ---------------------------------------------------------------------------
+// Confirmed snapshot (persisted at confirmation time)
+// ---------------------------------------------------------------------------
+
+export interface SnapshotItem {
+  catalogId: number;
+  productName: string;
+  quantity: number;
+  unit: string;
+  shopProductId: number;
+  unitPrice: number;
+}
+
+export interface SnapshotAssignment {
+  shopId: number;
+  shopName: string;
+  items: SnapshotItem[];
+  subtotal: number;
+}
+
+export interface ConfirmedSnapshot {
+  assignments: SnapshotAssignment[];
+  nearbyShopIds: number[];
+}

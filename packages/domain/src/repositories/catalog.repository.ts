@@ -1,51 +1,12 @@
-import { Database } from '../lib/db';
-
-// ---------------------------------------------------------------------------
-// Row types
-// ---------------------------------------------------------------------------
-
-export interface CatalogSearchRow {
-  catalog_id: number;
-  name: string;
-  brand: string | null;
-  unit: string | null;
-  price: number;
-  in_stock: boolean;
-  score: number;
-}
-
-export interface CatalogItemRow {
-  id: number;
-  name: string;
-  brand: string | null;
-  unit: string | null;
-  category_id: number | null;
-  description: string | null;
-}
-
-export interface SubstituteRow {
-  catalog_id: number;
-  name: string;
-  unit: string | null;
-  price: number;
-}
-
-// ---------------------------------------------------------------------------
-// Repository — primary tables: catalog, tag
-// ---------------------------------------------------------------------------
+import { IDatabase, CatalogSearchRow, CatalogItemRow, SubstituteRow } from '../types';
 
 export class CatalogRepository {
-  private readonly db: Database;
+  private readonly db: IDatabase;
 
-  constructor(db: Database) {
+  constructor(db: IDatabase) {
     this.db = db;
   }
 
-  /**
-   * Hybrid search: match query tokens against tag aliases (score 2)
-   * and catalog name (score 1). Returns catalog-level results with
-   * cheapest price across the given shops.
-   */
   public async search(
     queryTokens: string[],
     shopIds: number[],
@@ -109,7 +70,6 @@ export class CatalogRepository {
     return result.rows;
   }
 
-  /** Check availability of specific catalog items at a specific shop. */
   public async checkAvailabilityAtShop(
     catalogIds: number[],
     shopId: number,
@@ -134,7 +94,6 @@ export class CatalogRepository {
     return result.rows;
   }
 
-  /** Find substitutes in the same category at a given shop. */
   public async findSubstitutes(
     catalogId: number,
     shopId: number,
@@ -165,7 +124,6 @@ export class CatalogRepository {
     return result.rows[0] ?? null;
   }
 
-  /** Check that a catalog ID exists. */
   public async exists(catalogId: number): Promise<boolean> {
     const result = await this.db.query<{ id: number }>(
       'SELECT id FROM catalog WHERE id = $1',
@@ -174,7 +132,6 @@ export class CatalogRepository {
     return result.rows.length > 0;
   }
 
-  /** Check if any of the given shops carry this catalog item and have stock. */
   public async isAvailableAtAnyShop(catalogId: number, shopIds: number[]): Promise<boolean> {
     if (shopIds.length === 0) return false;
     const result = await this.db.query<{ found: boolean }>(

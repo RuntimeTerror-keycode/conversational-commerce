@@ -159,6 +159,8 @@ CREATE TABLE master_order (
     total_amount        DECIMAL(10,2) NOT NULL DEFAULT 0,
     confirmation_token  VARCHAR(100),
     token_expires_at    TIMESTAMPTZ,
+    confirmed_snapshot  JSONB,
+    cart_hash           VARCHAR(64),
     trace_id            VARCHAR(100),
     created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at          TIMESTAMPTZ

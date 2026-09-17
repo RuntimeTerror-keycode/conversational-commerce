@@ -1,83 +1,17 @@
 import { PoolClient } from 'pg';
-
-import { Database } from '../lib/db';
-
-// ---------------------------------------------------------------------------
-// Row types
-// ---------------------------------------------------------------------------
-
-export interface FulfillmentListRow {
-  id: number;
-  status: string;
-  subtotal: string;
-  accepted_at: Date | null;
-  updated_at: Date | null;
-  order_code: string;
-  delivery_type: string;
-  customer_name: string | null;
-  customer_phone: string;
-  item_count: number;
-}
-
-export interface StatusCountRow {
-  status: string;
-  count: number;
-}
-
-export interface FulfillmentDetailRow {
-  id: number;
-  master_order_id: number;
-  shop_id: number;
-  status: string;
-  subtotal: string;
-  accepted_at: Date | null;
-  packed_at: Date | null;
-  out_for_delivery_at: Date | null;
-  delivered_at: Date | null;
-  rejected_at: Date | null;
-  rejection_reason: string | null;
-  updated_at: Date | null;
-  order_code: string;
-  delivery_type: string;
-  delivery_note: string | null;
-  payment_mode: string;
-  trace_id: string | null;
-  customer_name: string | null;
-  customer_phone: string;
-  address_line: string | null;
-  city: string | null;
-  pincode: string | null;
-}
-
-export interface FulfillmentStatusRow {
-  id: number;
-  status: string;
-}
-
-interface TotalRow {
-  total: number;
-}
-
-// ---------------------------------------------------------------------------
-// Query params
-// ---------------------------------------------------------------------------
-
-export interface FulfillmentListParams {
-  shopId: number;
-  status?: string;
-  since?: string;
-  limit: number;
-  offset: number;
-}
-
-// ---------------------------------------------------------------------------
-// Repository — primary table: fulfillment
-// ---------------------------------------------------------------------------
+import {
+  IDatabase,
+  FulfillmentListRow,
+  FulfillmentDetailRow,
+  FulfillmentStatusRow,
+  FulfillmentListParams,
+  StatusCountRow,
+} from '../types';
 
 export class FulfillmentRepository {
-  private readonly db: Database;
+  private readonly db: IDatabase;
 
-  constructor(db: Database) {
+  constructor(db: IDatabase) {
     this.db = db;
   }
 
@@ -106,7 +40,7 @@ export class FulfillmentRepository {
   public async countByShop(shopId: number, status?: string, since?: string): Promise<number> {
     const { where, values } = this.buildWhereClause(shopId, status, since);
 
-    const result = await this.db.query<TotalRow>(
+    const result = await this.db.query<{ total: number }>(
       `SELECT count(*)::int AS total FROM fulfillment f WHERE ${where}`,
       values,
     );
@@ -148,7 +82,6 @@ export class FulfillmentRepository {
     return result.rows[0] ?? null;
   }
 
-  /** Update status within an existing transaction. */
   public async setStatus(client: PoolClient, fulfillmentId: number, shopId: number, status: string, tsCol: string): Promise<void> {
     await client.query(
       `UPDATE fulfillment
@@ -158,7 +91,6 @@ export class FulfillmentRepository {
     );
   }
 
-  /** Create a fulfillment row within a transaction (order placement). */
   public async insertTx(
     client: PoolClient,
     masterOrderId: number,

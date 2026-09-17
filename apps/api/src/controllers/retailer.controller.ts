@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 
-import { RetailerResolveService } from '../services/retailer-resolve.service';
+import { RetailerResolveService } from '@cc/domain';
 
 export class RetailerController {
   private readonly service: RetailerResolveService;

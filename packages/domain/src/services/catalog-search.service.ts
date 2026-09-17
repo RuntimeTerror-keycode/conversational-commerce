@@ -1,33 +1,24 @@
 import { AppError } from '../lib/app-error';
-import { Logger } from '../logger/logger';
+import { ILogger, DomainProduct, AvailabilityResult } from '../types';
 import { CatalogRepository } from '../repositories/catalog.repository';
 import { RetailerResolveService } from './retailer-resolve.service';
-import { DomainProduct, AvailabilityResult } from '../types';
 import { defaultSearchLimit, maxSearchLimit } from '../constants';
-
-// ---------------------------------------------------------------------------
-// Service
-// ---------------------------------------------------------------------------
 
 export class CatalogSearchService {
   private readonly catalogRepo: CatalogRepository;
   private readonly retailerService: RetailerResolveService;
-  private readonly logger: Logger;
+  private readonly logger: ILogger;
 
   constructor(
     catalogRepo: CatalogRepository,
     retailerService: RetailerResolveService,
-    logger: Logger,
+    logger: ILogger,
   ) {
     this.catalogRepo = catalogRepo;
     this.retailerService = retailerService;
     this.logger = logger.child('CatalogSearchService');
   }
 
-  /**
-   * Search products across all nearby shops for a customer.
-   * Returns catalog-level results with cheapest price.
-   */
   public async searchProducts(
     customerId: string,
     query: string,
@@ -69,10 +60,6 @@ export class CatalogSearchService {
     }));
   }
 
-  /**
-   * Check availability of specific catalog items at a specific shop.
-   * Returns stock status + substitutes from that shop's inventory.
-   */
   public async checkAvailability(
     retailerId: string,
     productIds: string[],
@@ -128,10 +115,6 @@ export class CatalogSearchService {
     return results;
   }
 
-  /**
-   * Tokenize a raw query string.
-   * Strips common noise words and short tokens.
-   */
   private tokenize(query: string): string[] {
     const noise = new Set(['und', 'undo', 'venam', 'veno', 'kg', 'g', 'ml', 'l', 'litre', 'gram', 'kilo', 'pack', 'pkt', 'no']);
     return query

@@ -1,43 +1,12 @@
-import { Database } from '../lib/db';
-import { InventoryCounts } from '../types';
-
-// ---------------------------------------------------------------------------
-// Row types
-// ---------------------------------------------------------------------------
-
-export interface ShopProductRow {
-  id: number;
-  catalog_id: number;
-  local_name: string | null;
-  regular_price: string;
-  selling_price: string;
-  stock_quantity: number;
-  low_stock_threshold: number;
-  is_available: boolean;
-  updated_at: Date | null;
-}
-
-export interface ShopProductListRow extends ShopProductRow {
-  catalog_name: string;
-  brand: string | null;
-  unit: string | null;
-  sku: string | null;
-  category_name: string | null;
-}
-
-export interface CatalogRow {
-  name: string;
-  brand: string | null;
-  unit: string | null;
-  sku: string | null;
-  category_name: string | null;
-}
-
-export interface SubstituteProductRow {
-  id: number;
-  selling_price: string;
-  local_name: string;
-}
+import {
+  IDatabase,
+  ShopProductRow,
+  ShopProductListRow,
+  ShopCatalogRow,
+  SubstituteProductRow,
+  InventoryCounts,
+  ShopProductListParams,
+} from '../types';
 
 interface TotalRow {
   total: number;
@@ -47,27 +16,10 @@ interface IdRow {
   id: number;
 }
 
-// ---------------------------------------------------------------------------
-// Query params
-// ---------------------------------------------------------------------------
-
-export interface ShopProductListParams {
-  shopId: number;
-  q?: string;
-  category?: string;
-  stockState?: string;
-  limit: number;
-  offset: number;
-}
-
-// ---------------------------------------------------------------------------
-// Repository — primary table: shop_product
-// ---------------------------------------------------------------------------
-
 export class ShopProductRepository {
-  private readonly db: Database;
+  private readonly db: IDatabase;
 
-  constructor(db: Database) {
+  constructor(db: IDatabase) {
     this.db = db;
   }
 
@@ -153,8 +105,8 @@ export class ShopProductRepository {
     return result.rows[0];
   }
 
-  public async findCatalog(catalogId: number): Promise<CatalogRow> {
-    const result = await this.db.query<CatalogRow>(
+  public async findCatalog(catalogId: number): Promise<ShopCatalogRow> {
+    const result = await this.db.query<ShopCatalogRow>(
       `SELECT cat.name, cat.brand, cat.unit, cat.sku, cg.name AS category_name
        FROM catalog cat
        LEFT JOIN category cg ON cg.id = cat.category_id
@@ -164,7 +116,6 @@ export class ShopProductRepository {
     return result.rows[0];
   }
 
-  /** Cheapest selling price per catalog item across given shops. */
   public async cheapestPrices(
     catalogIds: number[],
     shopIds: number[],
@@ -183,7 +134,6 @@ export class ShopProductRepository {
     return result.rows;
   }
 
-  /** Find the shop_product row for a catalog item at a specific shop. */
   public async findByCatalogAndShop(
     catalogId: number,
     shopId: number,

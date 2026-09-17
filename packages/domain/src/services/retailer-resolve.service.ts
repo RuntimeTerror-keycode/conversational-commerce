@@ -1,23 +1,18 @@
 import { AppError } from '../lib/app-error';
 import { haversineKm } from '../lib/geo';
-import { Logger } from '../logger/logger';
+import { ILogger, ShopWithLocationRow, ResolveRetailerResponse, NearbyShop } from '../types';
 import { CustomerRepository } from '../repositories/customer.repository';
-import { ShopRepository, ShopWithLocationRow } from '../repositories/shop.repository';
-import { ResolveRetailerResponse, NearbyShop } from '../types';
-
-// ---------------------------------------------------------------------------
-// Service
-// ---------------------------------------------------------------------------
+import { ShopRepository } from '../repositories/shop.repository';
 
 export class RetailerResolveService {
   private readonly customerRepo: CustomerRepository;
   private readonly shopRepo: ShopRepository;
-  private readonly logger: Logger;
+  private readonly logger: ILogger;
 
   constructor(
     customerRepo: CustomerRepository,
     shopRepo: ShopRepository,
-    logger: Logger,
+    logger: ILogger,
   ) {
     this.customerRepo = customerRepo;
     this.shopRepo = shopRepo;
@@ -60,10 +55,6 @@ export class RetailerResolveService {
     };
   }
 
-  /**
-   * Resolve only the nearby shop IDs for a customer phone.
-   * Used internally by other services (search, cart pricing).
-   */
   public async resolveNearbyShopIds(customerPhone: string): Promise<number[]> {
     const customer = await this.customerRepo.findWithDefaultAddress(customerPhone);
     if (!customer) {
@@ -84,7 +75,6 @@ export class RetailerResolveService {
 
     for (const shop of shops) {
       if (custLat === null || custLng === null || shop.latitude === null || shop.longitude === null) {
-        // No geo data — include all active shops at distance 0 (hackathon fallback)
         results.push({
           retailerId: String(shop.id),
           name: shop.name,

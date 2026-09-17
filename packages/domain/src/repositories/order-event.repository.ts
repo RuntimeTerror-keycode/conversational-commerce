@@ -1,27 +1,10 @@
 import { PoolClient } from 'pg';
-
-import { Database } from '../lib/db';
-
-// ---------------------------------------------------------------------------
-// Row types
-// ---------------------------------------------------------------------------
-
-export interface OrderEventRow {
-  id: number;
-  eventType: string;
-  actor: string;
-  note: string | null;
-  createdAt: Date;
-}
-
-// ---------------------------------------------------------------------------
-// Repository — primary table: order_event
-// ---------------------------------------------------------------------------
+import { IDatabase, OrderEventRow } from '../types';
 
 export class OrderEventRepository {
-  private readonly db: Database;
+  private readonly db: IDatabase;
 
-  constructor(db: Database) {
+  constructor(db: IDatabase) {
     this.db = db;
   }
 
@@ -41,7 +24,6 @@ export class OrderEventRepository {
     return result.rows;
   }
 
-  /** Insert an event within an existing transaction. */
   public async insert(client: PoolClient, fulfillmentId: number, eventType: string, actor: string, note: string): Promise<void> {
     await client.query(
       `INSERT INTO order_event (fulfillment_id, master_order_id, event_type, actor, note)

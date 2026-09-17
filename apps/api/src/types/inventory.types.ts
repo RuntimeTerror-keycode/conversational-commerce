@@ -1,4 +1,7 @@
 import { PaginatedResponse } from './index';
+import { InventoryCounts } from '@cc/domain';
+
+export { InventoryCounts } from '@cc/domain';
 
 export interface ProductSummary {
   id: number;
@@ -15,13 +18,6 @@ export interface ProductSummary {
   lowStockThreshold: number;
   isLow: boolean;
   updatedAt: string | null;
-}
-
-export interface InventoryCounts {
-  total: number;
-  inStock: number;
-  low: number;
-  out: number;
 }
 
 export interface InventoryListResponse extends PaginatedResponse<ProductSummary> {
