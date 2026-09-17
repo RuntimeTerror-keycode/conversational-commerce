@@ -18,6 +18,27 @@ export type ModelProvider = "deepseek" | "anthropic" | "google";
  * assignment doesn't typecheck. Revisit this cast if a future @mastra/core
  * release aligns its vendored provider version.
  */
+/**
+ * The provider's own model, uncast. Mastra vendors an older @ai-sdk/provider
+ * internally, so the cast below is needed to hand a model to an Agent — but
+ * calls made through the `ai` package directly (generateObject for vision)
+ * need the untouched type, not the Mastra one.
+ */
+export function resolveRawModel(
+  modelId: string,
+  provider: ModelProvider = (process.env.MODEL_PROVIDER as ModelProvider) ?? "deepseek",
+) {
+  switch (provider) {
+    case "anthropic":
+      return anthropic(modelId);
+    case "google":
+      return google(modelId);
+    case "deepseek":
+    default:
+      return deepseek(modelId);
+  }
+}
+
 export function resolveModel(
   modelId: string,
   provider: ModelProvider = (process.env.MODEL_PROVIDER as ModelProvider) ?? "deepseek",
@@ -34,3 +55,4 @@ export function resolveModel(
 }
 
 export const mainModel = resolveModel(process.env.MODEL_MAIN ?? "deepseek-flash");
+export const rawMainModel = resolveRawModel(process.env.MODEL_MAIN ?? "deepseek-flash");
