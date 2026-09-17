@@ -20,6 +20,7 @@ import { MasterOrderRepository } from '../repositories/master-order.repository';
 import { OrderEventRepository } from '../repositories/order-event.repository';
 import { OrderItemRepository } from '../repositories/order-item.repository';
 import { ShopRepository } from '../repositories/shop.repository';
+import { ShopProductRepository } from '../repositories/shop-product.repository';
 import { generateOrderCode } from '../lib/order-code';
 import {
   confirmationTokenTtlMinutes,
@@ -35,6 +36,7 @@ export class OrderPlacementService {
   private readonly fulfillmentRepo: FulfillmentRepository;
   private readonly orderItemRepo: OrderItemRepository;
   private readonly orderEventRepo: OrderEventRepository;
+  private readonly shopProductRepo: ShopProductRepository;
   private readonly db: IDatabase;
   private readonly logger: ILogger;
 
@@ -46,6 +48,7 @@ export class OrderPlacementService {
     fulfillmentRepo: FulfillmentRepository;
     orderItemRepo: OrderItemRepository;
     orderEventRepo: OrderEventRepository;
+    shopProductRepo: ShopProductRepository;
     db: IDatabase;
     logger: ILogger;
   }) {
@@ -56,16 +59,19 @@ export class OrderPlacementService {
     this.fulfillmentRepo = deps.fulfillmentRepo;
     this.orderItemRepo = deps.orderItemRepo;
     this.orderEventRepo = deps.orderEventRepo;
+    this.shopProductRepo = deps.shopProductRepo;
     this.db = deps.db;
     this.logger = deps.logger.child('OrderPlacementService');
   }
 
   /**
    * Save a delivery address exactly as the customer typed it in chat. No
-   * coordinates — WhatsApp text has none, and guessing them from a pasted
-   * map link or landmark name is not this service's job (nor the model's;
-   * see apps/agent's prompt). A real WhatsApp location share still goes
-   * through here as text, geocoded upstream by the edge before it arrives.
+   * coordinates here — this is the model-driven path (the setDeliveryAddress
+   * tool), and a customer's typed text never has real coordinates to give.
+   * A genuine WhatsApp location share's coordinates are recorded separately
+   * and deterministically, in code, by recordSharedLocation below — never
+   * through this tool-driven path, so shop-distance routing can never
+   * depend on the model faithfully copying numbers through.
    */
   public async setDeliveryAddress(customerId: string, addressLine: string): Promise<{ deliveryAddress: string }> {
     const customer = await this.customerRepo.findByPhone(customerId);
@@ -81,6 +87,35 @@ export class OrderPlacementService {
     this.logger.info('Delivery address set', { customerId: customer.id });
 
     return { deliveryAddress: trimmed };
+  }
+
+  /**
+   * Records a real WhatsApp location share's coordinates against the
+   * customer's default address. Called directly from apps/agent's turn
+   * handler before the model ever runs — not a tool, so it can't be skipped
+   * or garbled by the model. This is the only path that ever writes real
+   * coordinates from the live conversation, which is what makes
+   * distance-based shop routing (RetailerResolveService.rankByDistance)
+   * actually reflect where the customer is.
+   */
+  public async recordSharedLocation(
+    customerId: string,
+    addressLine: string,
+    latitude: number,
+    longitude: number,
+  ): Promise<void> {
+    // Runs before resolveRetailer() (so this turn's shop routing can use it
+    // immediately), which is otherwise what auto-creates a new customer —
+    // so this path must be able to create one too, not just find one.
+    const customer = await this.customerRepo.findOrCreateByPhone(customerId);
+
+    await this.customerRepo.upsertDefaultAddress(customer.id, {
+      addressLine: addressLine.trim() || undefined,
+      latitude,
+      longitude,
+    });
+
+    this.logger.info('Shared location recorded', { customerId: customer.id, latitude, longitude });
   }
 
   /** Save the customer's chosen payment method — 'cod' or 'gpay'. */
@@ -246,6 +281,10 @@ export class OrderPlacementService {
             unitPrice: item.unitPrice,
           })),
         );
+
+        for (const item of assignment.items) {
+          await this.shopProductRepo.decrementStockTx(client, item.shopProductId, item.quantity);
+        }
 
         await this.orderEventRepo.insert(
           client,

@@ -51,6 +51,8 @@ class AgentTurnRequest(BaseModel):
     text: str
     source: Literal["text", "voice"]
     locale: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
 
 class AgentTurnResponse(BaseModel):
     traceId: str
