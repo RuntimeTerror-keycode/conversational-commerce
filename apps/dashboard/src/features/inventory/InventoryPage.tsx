@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Ban, Boxes, Info, Plus, Search, TriangleAlert } from 'lucide-react';
+import { Ban, Boxes, Lock, Plus, Search, TriangleAlert } from 'lucide-react';
 import { ApiRequestError } from '@/api/client';
 import type { InventoryListQuery, Product, SessionShop } from '@/api/types';
 import { PageHeader } from '@/app/PageHeader';
@@ -13,18 +13,26 @@ import { Toggle } from '@/components/ui/Toggle';
 import { useToast } from '@/components/ui/Toast';
 import { useSession } from '@/features/auth/useSession';
 import { cn } from '@/lib/cn';
+import { formatMoney } from '@/lib/format';
 import { AddProductDrawer } from './AddProductDrawer';
 import { CategoryChips } from './CategoryChips';
 import { PriceCell } from './PriceCell';
 import { StockStepper } from './StockStepper';
-import { SyncBanner } from './SyncBanner';
 import { useInventory, useUpdateProduct } from './useInventory';
 
 /** 'all' is UI-only — the API filter is simply omitted for it. */
 type StockState = NonNullable<InventoryListQuery['stockState']> | 'all';
 
-const grid =
+const editableGrid =
   'grid grid-cols-[minmax(0,1fr)_176px_132px_196px_128px] items-center gap-4 px-6';
+
+/**
+ * A synced shop has nothing to click, so the controls' widths go back to the
+ * data. The availability toggle disappears rather than becoming a disabled
+ * switch — a control you can never move is worse than no control.
+ */
+const readOnlyGrid =
+  'grid grid-cols-[minmax(0,1fr)_minmax(0,176px)_132px_132px] items-center gap-4 px-6';
 
 function InventoryTable({ shop }: { shop: SessionShop }) {
   const toast = useToast();
@@ -35,6 +43,7 @@ function InventoryTable({ shop }: { shop: SessionShop }) {
   const [stockState, setStockState] = useState<StockState>('all');
 
   const editable = shop.inventoryMode === 'managed';
+  const grid = editable ? editableGrid : readOnlyGrid;
   const { data, isPending, error, refetch, isPlaceholderData } = useInventory({
     q: search || undefined,
     category: category || undefined,
@@ -78,25 +87,28 @@ function InventoryTable({ shop }: { shop: SessionShop }) {
         />
       </div>
 
-      <div className="overflow-hidden rounded-lg border border-border bg-surface">
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-border bg-surface">
         <div
           className={cn(
             grid,
-            'border-b border-border bg-surface-sunken py-2.5 text-caption text-text-muted uppercase',
+            'shrink-0 border-b border-border bg-surface-sunken py-2.5 text-caption text-text-muted uppercase',
           )}
         >
-          <div>Product · your name</div>
+          <div>{editable ? 'Product · your name' : 'Product'}</div>
           <div>Category</div>
-          <div>Your price</div>
+          <div>{editable ? 'Your price' : 'Price'}</div>
           <div>Stock</div>
-          <div className="text-right">Available</div>
+          {editable ? <div className="text-right">Available</div> : null}
         </div>
 
+        {/* The one scrolling element on the page: the filters, the column
+            headings and the footnote all stay where the reader left them. */}
+        <div className="min-h-0 flex-1 overflow-y-auto">
         {isPending && !data ? (
           <div className="divide-y divide-neutral-bg">
             {Array.from({ length: 6 }, (_, index) => (
               <div key={index} className={cn(grid, 'py-3.5')}>
-                {Array.from({ length: 5 }, (_, cell) => (
+                {Array.from({ length: editable ? 5 : 4 }, (_, cell) => (
                   <Skeleton key={cell} className="h-8" />
                 ))}
               </div>
@@ -153,25 +165,38 @@ function InventoryTable({ shop }: { shop: SessionShop }) {
                       {product.name}
                     </span>
                   ) : null}
+                  {!editable && product.sku ? (
+                    <span className="font-code truncate text-xs text-text-disabled">
+                      {product.sku}
+                    </span>
+                  ) : null}
                 </div>
 
                 <div className="truncate text-small text-text-secondary">
                   {product.category ?? '—'}
                 </div>
 
-                <PriceCell
-                  value={product.sellingPrice}
-                  disabled={!editable}
-                  onCommit={(sellingPrice) => patch(product, { sellingPrice })}
-                />
+                {editable ? (
+                  <PriceCell
+                    value={product.sellingPrice}
+                    onCommit={(sellingPrice) => patch(product, { sellingPrice })}
+                  />
+                ) : (
+                  <div className="font-numeric text-body">
+                    {formatMoney(product.sellingPrice)}
+                  </div>
+                )}
 
                 <div className="flex items-center gap-2.5">
-                  <StockStepper
-                    value={product.stockQuantity}
-                    isLow={product.isLow}
-                    disabled={!editable}
-                    onCommit={(stockQuantity) => patch(product, { stockQuantity })}
-                  />
+                  {editable ? (
+                    <StockStepper
+                      value={product.stockQuantity}
+                      isLow={product.isLow}
+                      onCommit={(stockQuantity) => patch(product, { stockQuantity })}
+                    />
+                  ) : (
+                    <span className="font-numeric text-body">{product.stockQuantity}</span>
+                  )}
                   {product.isLow ? (
                     <Badge tone="warning" icon={TriangleAlert}>
                       Low
@@ -183,30 +208,20 @@ function InventoryTable({ shop }: { shop: SessionShop }) {
                   ) : null}
                 </div>
 
-                <div className="flex justify-end">
-                  <Toggle
-                    checked={product.inStock}
-                    disabled={!editable}
-                    label={`${product.localName ?? product.name} available`}
-                    onChange={(inStock) => patch(product, { inStock })}
-                  />
-                </div>
+                {editable ? (
+                  <div className="flex justify-end">
+                    <Toggle
+                      checked={product.inStock}
+                      label={`${product.localName ?? product.name} available`}
+                      onChange={(inStock) => patch(product, { inStock })}
+                    />
+                  </div>
+                ) : null}
               </div>
             ))}
           </div>
         )}
-
-      </div>
-
-      <div className="flex items-start gap-2.5 rounded-lg border border-border bg-surface px-3.5 py-3">
-        <Info className="mt-0.5 size-4 shrink-0 text-text-disabled" aria-hidden />
-        <p className="text-small text-text-secondary">
-          Products are never deleted. Switch one off and customers stop being offered
-          it, while every past order still reads correctly.
-          {editable
-            ? ' Price and stock save as you type — there is no Save button to forget.'
-            : ''}
-        </p>
+        </div>
       </div>
     </>
   );
@@ -229,14 +244,17 @@ export function InventoryPage() {
               <Plus className="size-3.5" aria-hidden />
               Add from catalogue
             </Button>
+          ) : shop ? (
+            <Badge tone="info" icon={Lock}>
+              Read only
+            </Badge>
           ) : undefined
         }
       />
 
-      <div className="mx-auto flex max-w-content flex-col gap-5 px-4 pb-[30px] md:px-9">
+      <div className="mx-auto flex min-h-0 w-full max-w-content flex-1 flex-col gap-5 px-4 pb-[30px] md:px-9">
         {shop ? (
           <>
-            <SyncBanner shop={shop} />
             <InventoryTable shop={shop} />
           </>
         ) : (

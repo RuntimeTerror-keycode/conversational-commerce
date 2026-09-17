@@ -1,8 +1,11 @@
-import { Navigate } from 'react-router-dom';
+import { useEffect, useRef } from 'react';
+import { Navigate, useLocation } from 'react-router-dom';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { ApiRequestError } from '@/api/client';
+import { readRememberedUsername } from '@/api/session';
+import { useToast } from '@/components/ui/Toast';
 import type { IdentifyRequest } from '@/api/types';
 import { useIdentify, useSession } from './useSession';
 import { cn } from '@/lib/cn';
@@ -29,11 +32,29 @@ type IdentifyForm = z.infer<typeof identifySchema>;
 export function LoginPage() {
   const session = useSession();
   const identifyMutation = useIdentify();
+  const location = useLocation();
+  const toast = useToast();
   const {
     register,
     handleSubmit,
     formState: { errors },
-  } = useForm<IdentifyForm>({ resolver: zodResolver(identifySchema) });
+  } = useForm<IdentifyForm>({
+    resolver: zodResolver(identifySchema),
+    // Coming back is one tap: the username is remembered on this device.
+    defaultValues: { username: readRememberedUsername() },
+  });
+
+  const signedOut = (location.state as { signedOut?: boolean } | null)?.signedOut ?? false;
+
+  // StrictMode runs effects twice in development, and this one has a visible
+  // side effect — without the latch the shopkeeper gets two toasts.
+  const announced = useRef(false);
+  useEffect(() => {
+    if (signedOut && !announced.current) {
+      announced.current = true;
+      toast('Signed out', 'success');
+    }
+  }, [signedOut, toast]);
 
   if (session.data) return <Navigate to="/" replace />;
 

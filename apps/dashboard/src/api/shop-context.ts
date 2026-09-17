@@ -13,6 +13,31 @@ import type { Session } from './types';
  */
 const STORAGE_KEY = 'kadakaran.session';
 
+/**
+ * Survives sign-out on purpose.
+ *
+ * Coming back is meant to be one tap: the username is not a secret — there is
+ * no password behind it — and re-typing it at a counter on a shared tablet is
+ * the kind of friction that makes people stay signed in when they shouldn't.
+ */
+const LAST_USER_KEY = 'kadakaran.lastUsername';
+
+export function rememberUsername(username: string): void {
+  try {
+    window.localStorage.setItem(LAST_USER_KEY, username);
+  } catch {
+    // Private mode, or storage disabled. Not worth failing sign-in over.
+  }
+}
+
+export function readRememberedUsername(): string {
+  try {
+    return window.localStorage.getItem(LAST_USER_KEY) ?? '';
+  } catch {
+    return '';
+  }
+}
+
 let cached: Session | null = null;
 
 export function readStoredSession(): Session | null {

@@ -79,18 +79,18 @@ export function HistoryPage() {
     <>
       <PageHeader eyebrow="Finished orders" title="Order history" />
 
-      <div className="mx-auto flex max-w-content flex-col gap-[22px] px-4 pb-[30px] md:px-9">
+      <div className="mx-auto flex min-h-0 w-full max-w-content flex-1 flex-col gap-[22px] px-4 pb-[30px] md:px-9">
         {orders.length > 0 ? (
           <span className="font-numeric self-end text-small text-text-muted">
             {formatMoney(takings)} across {plural(orders.length, 'order')} shown
           </span>
         ) : null}
 
-        <div className="overflow-hidden rounded-lg border border-border bg-surface">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-border bg-surface">
           <div
             className={cn(
               grid,
-              'border-b border-border bg-surface-sunken py-2.5 text-caption text-text-muted uppercase',
+              'shrink-0 border-b border-border bg-surface-sunken py-2.5 text-caption text-text-muted uppercase',
             )}
           >
             <div>Order</div>
@@ -101,6 +101,7 @@ export function HistoryPage() {
             <div>Finished</div>
           </div>
 
+          <div className="min-h-0 flex-1 overflow-y-auto">
           {isPending && !data ? (
             <div className="divide-y divide-neutral-bg">
               {Array.from({ length: 5 }, (_, index) => (
@@ -166,8 +167,10 @@ export function HistoryPage() {
             </div>
           )}
 
+          </div>
+
           {orders.length > 0 ? (
-            <div className="flex items-center justify-between gap-3 border-t border-border bg-surface-sunken px-6 py-3">
+            <div className="flex shrink-0 items-center justify-between gap-3 border-t border-border bg-surface-sunken px-6 py-3">
               <span className="font-numeric text-small text-text-muted">
                 Showing {orders.length} of {total} finished orders
               </span>

@@ -68,7 +68,10 @@ export class FulfillmentRepository {
     const result = await this.db.query<{ total: string; today: string }>(
       `SELECT
          COALESCE(SUM(subtotal), 0)::text AS total,
-         COALESCE(SUM(subtotal) FILTER (WHERE delivered_at >= date_trunc('day', NOW())), 0)::text AS today
+         COALESCE(SUM(subtotal) FILTER (
+           WHERE delivered_at >= date_trunc('day', NOW() AT TIME ZONE 'Asia/Kolkata')
+                                  AT TIME ZONE 'Asia/Kolkata'
+         ), 0)::text AS today
        FROM fulfillment
        WHERE shop_id = $1 AND status = 'delivered'`,
       [shopId],
