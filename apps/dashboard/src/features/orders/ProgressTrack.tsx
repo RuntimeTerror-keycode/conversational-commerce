@@ -1,3 +1,4 @@
+import { Fragment } from 'react';
 import type { FulfillmentStatus } from '@/api/types';
 import { cn } from '@/lib/cn';
 import { stepIndex } from './lifecycle';
@@ -31,13 +32,15 @@ export function ProgressTrack({ status }: { status: FulfillmentStatus }) {
   const reached = status === 'rejected' ? -1 : stepIndex(status);
 
   return (
+    // The connectors stretch so the rail fills its column edge to edge, rather
+    // than sitting in the left third of it with dead space after.
     <div className="flex items-center gap-[5px]" aria-hidden>
       {[0, 1, 2, 3].map((node) => (
-        <div key={node} className="flex items-center gap-[5px]">
+        <Fragment key={node}>
           {node > 0 ? (
             <span
               className={cn(
-                'h-0.5 w-5 shrink-0',
+                'h-0.5 min-w-4 flex-1',
                 node <= reached ? fill[status] : 'bg-neutral-border',
               )}
             />
@@ -50,7 +53,7 @@ export function ProgressTrack({ status }: { status: FulfillmentStatus }) {
                 : 'border-border-strong bg-surface',
             )}
           />
-        </div>
+        </Fragment>
       ))}
     </div>
   );

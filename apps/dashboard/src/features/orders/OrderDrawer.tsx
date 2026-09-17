@@ -31,7 +31,7 @@ export function OrderDrawer({ orderId, onClose }: OrderDrawerProps) {
   const { data: order, isPending, error, refetch } = useFulfillment(orderId);
   const advance = useAdvanceFulfillment();
 
-  const action = order ? nextAction(order.status) : null;
+  const action = order ? nextAction(order.status, order.delivery.type) : null;
   const sourceLines = (order?.items ?? [])
     .map((line) => line.sourceText)
     .filter((text): text is string => Boolean(text));
@@ -121,7 +121,7 @@ export function OrderDrawer({ orderId, onClose }: OrderDrawerProps) {
                 ) : null}
 
                 <section className="flex flex-col gap-3.5 border-b border-neutral-bg px-6.5 pt-4.5 pb-4">
-                  <SectionLabel>Pack these</SectionLabel>
+                  <SectionLabel>Items</SectionLabel>
 
                   {order.items.map((line, index) => (
                     <div
@@ -180,7 +180,10 @@ export function OrderDrawer({ orderId, onClose }: OrderDrawerProps) {
                     <SectionLabel>
                       {order.delivery.type === 'pickup' ? 'Pickup' : 'Deliver to'}
                     </SectionLabel>
-                    {order.delivery.address ? (
+                    {/* A pickup carries the customer's home address too, but
+                        nobody is driving there — showing it would read as a
+                        delivery instruction. */}
+                    {order.delivery.type !== 'pickup' && order.delivery.address ? (
                       <p className="flex items-start gap-2 text-small text-text-secondary">
                         <MapPin className="mt-0.5 size-3.5 shrink-0 text-text-disabled" aria-hidden />
                         <span>
@@ -190,7 +193,11 @@ export function OrderDrawer({ orderId, onClose }: OrderDrawerProps) {
                         </span>
                       </p>
                     ) : (
-                      <p className="text-small text-text-muted">Collected at the counter</p>
+                      <p className="text-small text-text-muted">
+                        {order.delivery.type === 'pickup'
+                          ? 'Collected at the counter'
+                          : 'No address on the order'}
+                      </p>
                     )}
                     {order.delivery.note ? (
                       <p className="text-[12.5px] text-text-muted italic">
@@ -217,19 +224,14 @@ export function OrderDrawer({ orderId, onClose }: OrderDrawerProps) {
           {order ? (
             <footer className="shrink-0 border-t border-border bg-canvas px-6.5 py-4">
               {action ? (
-                <>
-                  <Button
-                    variant="primary"
-                    className="w-full"
-                    loading={advance.isPending}
-                    onClick={() => onAdvance(action.status)}
-                  >
-                    {action.label}
-                  </Button>
-                  <p className="mt-2 text-center text-[12.5px] text-text-muted">
-                    The only action here. Nothing to accept, nothing to reject.
-                  </p>
-                </>
+                <Button
+                  variant="primary"
+                  className="w-full"
+                  loading={advance.isPending}
+                  onClick={() => onAdvance(action.status)}
+                >
+                  {action.label}
+                </Button>
               ) : (
                 <p className="text-center text-small text-text-muted">
                   {order.status === 'delivered' ? 'Order complete' : 'No further action'}

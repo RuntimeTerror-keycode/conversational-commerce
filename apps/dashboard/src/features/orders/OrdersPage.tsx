@@ -1,13 +1,12 @@
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { ArrowRight, PackageCheck, RefreshCw } from 'lucide-react';
+import { ArrowRight, PackageCheck } from 'lucide-react';
 import { ApiRequestError } from '@/api/client';
 import type { DashboardTransition, FulfillmentSummary } from '@/api/types';
 import { PageHeader } from '@/app/PageHeader';
 import { Badge } from '@/components/ui/Badge';
-import { Button, IconButton } from '@/components/ui/Button';
+import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
-import { LiveDot } from '@/components/ui/LiveDot';
 import { Segmented, type SegmentItem } from '@/components/ui/Segmented';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { useToast } from '@/components/ui/Toast';
@@ -15,6 +14,7 @@ import { formatMoney, formatTime, plural, timeAgo } from '@/lib/format';
 import { cn } from '@/lib/cn';
 import { OrderDrawer } from './OrderDrawer';
 import { ProgressTrack } from './ProgressTrack';
+import { nextAction } from './lifecycle';
 import { stageMeta } from './stageMeta';
 import { useAdvanceFulfillment, useFulfillments } from './useOrders';
 
@@ -32,9 +32,15 @@ import { useAdvanceFulfillment, useFulfillments } from './useOrders';
 const tabStatuses = ['accepted', 'packed', 'out_for_delivery'] as const;
 type Tab = (typeof tabStatuses)[number];
 
-/** Matches the column rhythm on every row, header and skeleton. */
+/**
+ * Matches the column rhythm on every row, header and skeleton.
+ *
+ * The slack is shared between customer, progress and age rather than dumped
+ * into one column — the design put item names under the customer to fill that
+ * track, and without them a single `1fr` leaves a visible canyon mid-row.
+ */
 const grid =
-  'grid grid-cols-[112px_minmax(0,1fr)_176px_104px_124px_172px] items-center gap-4 px-[22px]';
+  'grid grid-cols-[112px_minmax(0,1.3fr)_minmax(120px,0.9fr)_104px_minmax(104px,0.8fr)_172px] items-center gap-4 px-[22px]';
 
 function isTab(value: string | null): value is Tab {
   return value !== null && (tabStatuses as readonly string[]).includes(value);
@@ -42,23 +48,19 @@ function isTab(value: string | null): value is Tab {
 
 function Row({
   order,
-  action,
   onOpen,
   onAdvance,
   pending,
 }: {
   order: FulfillmentSummary;
-  action: string;
   onOpen: (id: number) => void;
   onAdvance: (id: number, status: DashboardTransition) => void;
   pending: boolean;
 }) {
-  const next: Record<string, DashboardTransition> = {
-    accepted: 'packed',
-    packed: 'out_for_delivery',
-    out_for_delivery: 'delivered',
-  };
-  const target = next[order.status];
+  // Worded per row, not per tab: a pickup is handed over the counter, not
+  // given to a driver.
+  const action = nextAction(order.status, order.deliveryType);
+  const name = order.customer.displayName;
 
   return (
     <div
@@ -85,10 +87,12 @@ function Row({
         className="flex min-w-0 flex-col gap-1 text-left"
       >
         <span className="truncate text-[15px] font-semibold">
-          {order.customer.displayName ?? order.customer.phone}
+          {name ?? order.customer.phone}
         </span>
-        <span className="truncate text-small text-text-secondary">
-          {plural(order.itemCount, 'item')}
+        {/* The count already sits under the total; the number to ring does not
+            appear anywhere else in the row. */}
+        <span className="font-numeric block h-[19px] truncate text-small text-text-secondary">
+          {name ? order.customer.phone : ''}
         </span>
       </button>
 
@@ -101,18 +105,18 @@ function Row({
         </div>
       </div>
 
-      <div className="text-small text-text-muted">
+      <div className="truncate text-small whitespace-nowrap text-text-muted">
         {order.acceptedAt ? timeAgo(order.acceptedAt) : '—'}
       </div>
 
       <div className="flex justify-end">
-        {target ? (
+        {action ? (
           <Button
             variant="primary"
             loading={pending}
-            onClick={() => onAdvance(order.id, target)}
+            onClick={() => onAdvance(order.id, action.status)}
           >
-            {action}
+            {action.label}
           </Button>
         ) : null}
       </div>
@@ -131,8 +135,9 @@ export function OrdersPage() {
   const stage = stageMeta[tab];
   const advance = useAdvanceFulfillment();
 
-  const { data, isPending, isFetching, error, refetch, isPlaceholderData } =
-    useFulfillments({ status: tab });
+  const { data, isPending, error, refetch, isPlaceholderData } = useFulfillments({
+    status: tab,
+  });
 
   const setTab = (value: Tab) =>
     setSearchParams(value === 'accepted' ? {} : { status: value }, { replace: true });
@@ -171,25 +176,7 @@ export function OrdersPage() {
 
   return (
     <>
-      <PageHeader
-        eyebrow="The work queue"
-        title="Orders"
-        actions={
-          <>
-            <LiveDot state={error ? 'stale' : 'live'} />
-            <IconButton
-              label="Refresh list"
-              onClick={() => void refetch()}
-              className="border border-border-strong bg-surface"
-            >
-              <RefreshCw
-                className={cn('size-4', isFetching && 'animate-spin')}
-                aria-hidden
-              />
-            </IconButton>
-          </>
-        }
-      />
+      <PageHeader eyebrow="The work queue" title="Orders" />
 
       <div className="mx-auto flex max-w-content flex-col gap-[22px] px-4 pb-[30px] md:px-9">
         <Segmented items={tabs} value={tab} onChange={setTab} />
@@ -255,7 +242,6 @@ export function OrdersPage() {
                   <Row
                     key={order.id}
                     order={order}
-                    action={stage.action}
                     onOpen={(id) => navigate(`/orders/${id}`)}
                     onAdvance={onAdvance}
                     pending={advance.isPending && advance.variables?.id === order.id}

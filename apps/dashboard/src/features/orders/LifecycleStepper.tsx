@@ -1,4 +1,4 @@
-import { Check, Inbox, Package, Truck } from 'lucide-react';
+import { Check, Inbox, Package, Store, Truck } from 'lucide-react';
 import type { FulfillmentDetail, FulfillmentStatus } from '@/api/types';
 import { formatTime } from '@/lib/format';
 import { cn } from '@/lib/cn';
@@ -16,6 +16,15 @@ const steps: Array<{
   { status: 'out_for_delivery', label: 'Out for delivery', icon: Truck, reached: 'border-violet bg-violet-bg text-violet-fg' },
   { status: 'delivered', label: 'Delivered', icon: Check, reached: 'border-success bg-success-bg text-success-fg' },
 ];
+
+/** A pickup never leaves on a van, so those two nodes say something else. */
+const pickupSteps = steps.map((step) =>
+  step.status === 'out_for_delivery'
+    ? { ...step, label: 'Ready for pickup', icon: Store }
+    : step.status === 'delivered'
+      ? { ...step, label: 'Collected' }
+      : step,
+);
 
 /**
  * Four nodes across the drawer header, with the stage labels beneath.
@@ -42,6 +51,7 @@ export function LifecycleStepper({ order }: { order: FulfillmentDetail }) {
   }
 
   const current = stepIndex(order.status);
+  const track = order.delivery.type === 'pickup' ? pickupSteps : steps;
   const times = [
     order.timeline.acceptedAt,
     order.timeline.packedAt,
@@ -52,10 +62,10 @@ export function LifecycleStepper({ order }: { order: FulfillmentDetail }) {
   return (
     <div className="flex flex-col gap-2">
       <ol className="flex items-center">
-        {steps.map((step, index) => {
+        {track.map((step, index) => {
           const done = index <= current;
           const Icon = step.icon;
-          const last = index === steps.length - 1;
+          const last = index === track.length - 1;
 
           return (
             <li
@@ -79,10 +89,10 @@ export function LifecycleStepper({ order }: { order: FulfillmentDetail }) {
       </ol>
 
       <div className="flex justify-between text-[11.5px] text-text-muted">
-        {steps.map((step, index) => (
+        {track.map((step, index) => (
           <span
             key={step.status}
-            className={cn('w-1/4', index === steps.length - 1 && 'text-right')}
+            className={cn('w-1/4', index === track.length - 1 && 'text-right')}
           >
             {step.label}
             {times[index] ? (

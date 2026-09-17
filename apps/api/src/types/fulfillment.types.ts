@@ -32,8 +32,17 @@ export interface FulfillmentCounts {
   rejected: number;
 }
 
+/** Money totals across every matching row, not just the returned page. */
+export interface FulfillmentTotals {
+  /** Sum of delivered fulfillments, all time. */
+  deliveredRevenue: number;
+  /** Sum of fulfillments delivered since midnight, shop-local. */
+  deliveredRevenueToday: number;
+}
+
 export interface FulfillmentListResponse extends PaginatedResponse<FulfillmentSummary> {
   counts: FulfillmentCounts;
+  totals: FulfillmentTotals;
 }
 
 export interface FulfillmentLineItem {

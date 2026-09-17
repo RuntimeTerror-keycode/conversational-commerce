@@ -1,21 +1,21 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link, useNavigate } from 'react-router-dom';
 import {
-  ArrowRight, Boxes, Check, Inbox, Info, Package, RefreshCw, Store, Truck, Wallet,
+  ArrowRight, Boxes, Check, Inbox, Info, Package, Store, Truck, Wallet,
 } from 'lucide-react';
 import { fetchProducts } from '@/api/inventory';
 import { queryKeys } from '@/api/keys';
 import type { FulfillmentSummary } from '@/api/types';
 import { PageHeader } from '@/app/PageHeader';
 import { Badge } from '@/components/ui/Badge';
-import { Button, IconButton } from '@/components/ui/Button';
+import { Button } from '@/components/ui/Button';
 import { Toggle } from '@/components/ui/Toggle';
 import { EmptyState } from '@/components/ui/EmptyState';
-import { LiveDot } from '@/components/ui/LiveDot';
 import { Panel, PanelHeader } from '@/components/ui/Panel';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { useShopSettings, useUpdateShopSettings } from '@/features/settings/useShopSettings';
 import { shopStatusMeta } from '@/features/settings/shopStatus';
+import { nextAction } from '@/features/orders/lifecycle';
 import { useAdvanceFulfillment, useFulfillments } from '@/features/orders/useOrders';
 import { StatTile } from '@/features/stats/StatTile';
 import { formatMoney, plural, timeAgo } from '@/lib/format';
@@ -44,17 +44,21 @@ function CountPill({ value, tone }: { value: number; tone?: 'attention' }) {
 
 function QueueRow({
   order,
-  action,
   onOpen,
   onAdvance,
   pending,
 }: {
   order: FulfillmentSummary;
-  action: { label: string; status: 'packed' | 'out_for_delivery' };
   onOpen: (id: number) => void;
   onAdvance: (id: number, status: 'packed' | 'out_for_delivery') => void;
   pending: boolean;
 }) {
+  // Both panels here hold orders that still have a step left, and the wording
+  // of that step depends on whether it leaves by van or over the counter.
+  const action = nextAction(order.status, order.deliveryType);
+  if (!action || action.status === 'delivered') return null;
+  const next = action.status;
+
   return (
     <div className="flex items-center gap-4 border-b border-neutral-bg px-4 py-3.5 transition-colors duration-[120ms] last:border-b-0 hover:bg-surface-hover">
       <button
@@ -93,9 +97,9 @@ function QueueRow({
       </div>
 
       <Button
-        variant={action.status === 'packed' ? 'primary' : 'secondary'}
+        variant={next === 'packed' ? 'primary' : 'secondary'}
         loading={pending}
-        onClick={() => onAdvance(order.id, action.status)}
+        onClick={() => onAdvance(order.id, next)}
       >
         {action.label}
       </Button>
@@ -162,25 +166,10 @@ export function DashboardPage() {
 
   return (
     <>
-      <PageHeader
-        eyebrow={today}
-        title="Today at the counter"
-        actions={
-          <>
-            <LiveDot state={waiting.error ? 'stale' : 'live'} />
-            <IconButton
-              label="Refresh"
-              onClick={() => void waiting.refetch()}
-              className="border border-border-strong bg-surface"
-            >
-              <RefreshCw
-                className={cn('size-4', waiting.isFetching && 'animate-spin')}
-                aria-hidden
-              />
-            </IconButton>
-          </>
-        }
-      />
+      {/* Freshness lives in one place — the shell's footer — rather than
+          being repeated per page. Nothing here is manually refreshed: every
+          query re-polls on its own. */}
+      <PageHeader eyebrow={today} title="Today at the counter" />
 
       <div className="mx-auto flex max-w-content flex-col gap-6 px-4 pb-[30px] md:px-9">
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
@@ -268,7 +257,6 @@ export function DashboardPage() {
                 <QueueRow
                   key={order.id}
                   order={order}
-                  action={{ label: 'Mark packed', status: 'packed' }}
                   onOpen={(id) => navigate(`/orders/${id}`)}
                   onAdvance={onAdvance}
                   pending={advance.isPending && advance.variables?.id === order.id}
@@ -312,7 +300,6 @@ export function DashboardPage() {
                 <QueueRow
                   key={order.id}
                   order={order}
-                  action={{ label: 'Hand over', status: 'out_for_delivery' }}
                   onOpen={(id) => navigate(`/orders/${id}`)}
                   onAdvance={onAdvance}
                   pending={advance.isPending && advance.variables?.id === order.id}
@@ -424,14 +411,6 @@ export function DashboardPage() {
                 </p>
               </div>
             ) : null}
-
-            <div className="flex items-start gap-2.5 rounded-lg border border-border bg-surface px-3.5 py-3">
-              <Info className="mt-0.5 size-4 shrink-0 text-text-disabled" aria-hidden />
-              <p className="text-small text-text-secondary">
-                Orders arrive already accepted. There is nothing to approve — only to
-                pack.
-              </p>
-            </div>
           </div>
         </div>
       </div>

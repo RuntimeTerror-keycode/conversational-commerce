@@ -2,7 +2,6 @@ import { Navigate } from 'react-router-dom';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
-import { Info } from 'lucide-react';
 import { ApiRequestError } from '@/api/client';
 import type { IdentifyRequest } from '@/api/types';
 import { useIdentify, useSession } from './useSession';
@@ -24,8 +23,8 @@ type IdentifyForm = z.infer<typeof identifySchema>;
  * Laid out from the design canvas "Login" artboard: 58/42 split, the product
  * explained on the left with a real WhatsApp message, the form alone on the
  * right. The left half is not decoration — a shopkeeper signing in for the
- * first time has no idea what this portal is, and the sample message explains
- * it faster than any feature list.
+ * first time has no idea what this portal is, and a real customer message
+ * explains it faster than any feature list.
  */
 export function LoginPage() {
   const session = useSession();
@@ -64,8 +63,8 @@ export function LoginPage() {
 
           <p className="max-w-[460px] text-[17px] leading-[1.6] text-pretty text-text-secondary">
             The counter view. Customers message the shop on WhatsApp; the assistant
-            reads them, matches your stock and places the order. Orders reach this
-            screen already accepted — you pack, hand over, and mark them off.
+            reads them, matches your stock and places the order. You pack, hand over,
+            and mark each one off as it goes.
           </p>
         </div>
 
@@ -83,8 +82,8 @@ export function LoginPage() {
           </div>
 
           <p className="max-w-[420px] text-small leading-[1.5] text-text-muted">
-            English, Malayalam and Manglish, often in one sentence. You never reply
-            here — the portal is only for packing.
+            English, Malayalam and Manglish, often in one sentence. Every line is
+            matched against what you have on the shelf.
           </p>
         </div>
       </div>
@@ -121,13 +120,12 @@ export function LoginPage() {
               )}
               {...register('username')}
             />
-            {message ? (
-              <p className="text-[12.5px] leading-[1.5] text-danger-fg">{message}</p>
-            ) : (
-              <p className="text-[12.5px] leading-[1.5] text-text-muted">
-                No password. If this is not your own device, sign out when you are done.
-              </p>
-            )}
+            <p
+              className="min-h-[19px] text-[12.5px] leading-[1.5] text-danger-fg"
+              role={message ? 'alert' : undefined}
+            >
+              {message}
+            </p>
           </div>
 
           <button
@@ -142,13 +140,6 @@ export function LoginPage() {
             {identifyMutation.isPending ? 'Signing in…' : 'Sign in'}
           </button>
         </form>
-
-        <div className="flex items-start gap-2.5 border-t border-border pt-5">
-          <Info className="mt-0.5 size-[15px] shrink-0 text-text-muted" aria-hidden />
-          <p className="text-[12.5px] leading-[1.55] text-text-secondary">
-            Username not recognised? Only the shop owner can add a counter login.
-          </p>
-        </div>
       </div>
     </div>
   );

@@ -11,7 +11,11 @@ export class InventoryRoute {
   }
 
   private initializeRoutes(controller: InventoryController, shopContext: ShopContextMiddleware): void {
+    // Declared before '/inventory/:id' so "catalog" is not parsed as an id.
+    this.router.get('/inventory/catalog', shopContext.handle, controller.catalog);
     this.router.get('/inventory', shopContext.handle, controller.list);
+    this.router.post('/inventory', shopContext.handle, controller.create);
     this.router.patch('/inventory/:id', shopContext.handle, controller.update);
+    this.router.delete('/inventory/:id', shopContext.handle, controller.remove);
   }
 }

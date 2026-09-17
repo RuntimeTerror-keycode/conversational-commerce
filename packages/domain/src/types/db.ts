@@ -286,4 +286,20 @@ export interface ShopUserRow {
   shop_name: string;
   shop_is_active: boolean;
   inventory_mode: string;
+  /** "HH:MM", or null when the shop has not set hours. */
+  opening_time: string | null;
+  closing_time: string | null;
+}
+
+/** The shop's own settings row — what the dashboard reads and writes. */
+export interface ShopSettingsRow {
+  id: number;
+  name: string;
+  owner_name: string | null;
+  phone: string;
+  opening_time: string | null;
+  closing_time: string | null;
+  is_active: boolean;
+  inventory_mode: string;
+  delivery_radius_km: string | null;
 }

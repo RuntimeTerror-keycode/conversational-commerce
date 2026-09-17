@@ -5,8 +5,6 @@ export interface StageMeta {
   label: string;
   hint: string;
   tone: Tone;
-  /** What the row's button says at this stage. */
-  action: string;
   emptyTitle: string;
   emptyBody: string;
 }
@@ -14,9 +12,8 @@ export interface StageMeta {
 /**
  * One entry per stage the work queue shows.
  *
- * The hints matter more than they look: a shopkeeper who has just opened the
- * portal for the first time learns the whole model from them — that orders
- * arrive already accepted, and that their job starts at bagging.
+ * The hint sits under the stage badge and says what the pile in front of the
+ * shopkeeper actually is, so the tab name does not have to carry it alone.
  */
 export const stageMeta: Record<
   Extract<FulfillmentStatus, 'accepted' | 'packed' | 'out_for_delivery'>,
@@ -24,25 +21,22 @@ export const stageMeta: Record<
 > = {
   accepted: {
     label: 'New',
-    hint: 'Already accepted by the system. Bag them in the order they arrived.',
+    hint: 'Oldest first — bag them in the order they came in.',
     tone: 'warning',
-    action: 'Mark packed',
     emptyTitle: 'Nothing waiting',
     emptyBody: 'New WhatsApp orders land here the moment they arrive.',
   },
   packed: {
     label: 'Packed',
-    hint: 'Bagged and waiting for the next delivery run or a pickup.',
+    hint: 'Bagged and waiting for the delivery run, or for the customer to come by.',
     tone: 'info',
-    action: 'Hand to delivery',
     emptyTitle: 'Nothing packed',
     emptyBody: 'Orders you mark packed wait here for the delivery run.',
   },
   out_for_delivery: {
     label: 'Out for delivery',
-    hint: 'With the driver. Mark each one off as it lands.',
+    hint: 'On the way, or waiting on the counter. Mark each one off as it lands.',
     tone: 'violet',
-    action: 'Mark delivered',
     emptyTitle: 'Nothing out for delivery',
     emptyBody: 'Orders on their way show here until they are delivered.',
   },

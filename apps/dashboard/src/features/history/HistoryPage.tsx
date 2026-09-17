@@ -1,32 +1,35 @@
 import { useState } from 'react';
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { Archive } from 'lucide-react';
-import type { FulfillmentStatus, FulfillmentSummary } from '@/api/types';
+import type { FulfillmentSummary } from '@/api/types';
 import { PageHeader } from '@/app/PageHeader';
 import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
-import { Segmented, type SegmentItem } from '@/components/ui/Segmented';
 import { Skeleton } from '@/components/ui/Skeleton';
-import { StatusBadge } from '@/features/orders/StatusBadge';
 import { useFulfillments } from '@/features/orders/useOrders';
 import { formatMoney, formatTime, plural } from '@/lib/format';
 import { cn } from '@/lib/cn';
 import { OrderDrawer } from '@/features/orders/OrderDrawer';
 
 /**
- * Finished orders, kept apart from the live queue.
+ * Delivered orders, kept apart from the live queue.
  *
  * The two are different jobs — one is work to do, the other a record to look
- * something up in. There are no action buttons here by design, and the header
- * says so, because an archive that looks editable invites people to try.
+ * something up in — so there are no action buttons here by design.
+ *
+ * Only `delivered` lands here. `rejected` exists in the schema but nothing in
+ * the product produces it: the agent auto-accepts and the dashboard 422s that
+ * transition, so a filter for it would never have anything to show.
  */
-type Filter = Extract<FulfillmentStatus, 'delivered' | 'rejected'>;
-
 const PAGE = 20;
 
+/**
+ * Slack is shared rather than dumped into the customer column — the same
+ * reason the work queue spreads its own tracks (see OrdersPage).
+ */
 const grid =
-  'grid grid-cols-[104px_minmax(0,1fr)_88px_88px_80px_88px_116px] items-center gap-4 px-6';
+  'grid grid-cols-[104px_minmax(0,1.3fr)_minmax(88px,0.7fr)_104px_minmax(88px,0.6fr)_minmax(88px,0.6fr)] items-center gap-4 px-6';
 
 /** "Today · 17 September", "Wednesday · 16 September". */
 function dayLabel(iso: string, now = new Date()): string {
@@ -61,48 +64,27 @@ function groupByDay(orders: FulfillmentSummary[]): Array<[string, FulfillmentSum
 export function HistoryPage() {
   const navigate = useNavigate();
   const { orderId } = useParams<{ orderId: string }>();
-  const [searchParams, setSearchParams] = useSearchParams();
   const [limit, setLimit] = useState(PAGE);
 
-  const param = searchParams.get('filter');
-  const filter: Filter = param === 'rejected' ? 'rejected' : 'delivered';
-
   const { data, isPending, error, refetch, isPlaceholderData } = useFulfillments({
-    status: filter,
+    status: 'delivered',
     limit,
   });
 
-  const setFilter = (value: Filter) => {
-    setLimit(PAGE);
-    setSearchParams(value === 'delivered' ? {} : { filter: value }, { replace: true });
-  };
-
-  const counts = data?.counts;
   const orders = data?.data ?? [];
   const total = data?.page.total ?? 0;
   const takings = orders.reduce((sum, order) => sum + order.subtotal, 0);
 
-  const filters: SegmentItem<Filter>[] = [
-    { value: 'delivered', label: 'Delivered', count: counts?.delivered },
-    { value: 'rejected', label: 'Rejected', count: counts?.rejected },
-  ];
-
   return (
     <>
-      <PageHeader
-        eyebrow="Finished orders"
-        title="Order history"
-      />
+      <PageHeader eyebrow="Finished orders" title="Order history" />
 
       <div className="mx-auto flex max-w-content flex-col gap-[22px] px-4 pb-[30px] md:px-9">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <Segmented items={filters} value={filter} onChange={setFilter} />
-          {orders.length > 0 ? (
-            <span className="font-numeric text-small text-text-muted">
-              {formatMoney(takings)} across {plural(orders.length, 'order')} shown
-            </span>
-          ) : null}
-        </div>
+        {orders.length > 0 ? (
+          <span className="font-numeric self-end text-small text-text-muted">
+            {formatMoney(takings)} across {plural(orders.length, 'order')} shown
+          </span>
+        ) : null}
 
         <div className="overflow-hidden rounded-lg border border-border bg-surface">
           <div
@@ -117,14 +99,13 @@ export function HistoryPage() {
             <div className="text-right">Total</div>
             <div>Placed</div>
             <div>Finished</div>
-            <div>Status</div>
           </div>
 
           {isPending && !data ? (
             <div className="divide-y divide-neutral-bg">
               {Array.from({ length: 5 }, (_, index) => (
                 <div key={index} className={cn(grid, 'py-3.5')}>
-                  {Array.from({ length: 7 }, (_, cell) => (
+                  {Array.from({ length: 6 }, (_, cell) => (
                     <Skeleton key={cell} className="h-4" />
                   ))}
                 </div>
@@ -136,11 +117,7 @@ export function HistoryPage() {
             <EmptyState
               icon={<Archive className="size-4.5" aria-hidden />}
               title="No orders here yet"
-              description={
-                filter === 'delivered'
-                  ? 'Completed orders are kept here once they are delivered.'
-                  : 'Nothing has been rejected.'
-              }
+              description="Completed orders are kept here once they are delivered."
             />
           ) : (
             <div className={isPlaceholderData ? 'opacity-50 transition-opacity' : undefined}>
@@ -161,16 +138,14 @@ export function HistoryPage() {
                         'transition-colors duration-[120ms] hover:bg-surface-hover',
                       )}
                     >
-                      <span
-                        className={cn(
-                          'font-code text-small',
-                          order.status === 'rejected' && 'text-text-disabled',
-                        )}
-                      >
-                        {order.orderCode}
-                      </span>
-                      <span className="truncate text-body font-medium">
-                        {order.customer.displayName ?? order.customer.phone}
+                      <span className="font-code text-small">{order.orderCode}</span>
+                      <span className="flex min-w-0 flex-col gap-0.5">
+                        <span className="truncate text-body font-medium">
+                          {order.customer.displayName ?? order.customer.phone}
+                        </span>
+                        <span className="font-numeric truncate text-small text-text-muted">
+                          {order.customer.displayName ? order.customer.phone : ''}
+                        </span>
                       </span>
                       <span className="font-numeric text-small text-text-muted">
                         {plural(order.itemCount, 'item')}
@@ -183,9 +158,6 @@ export function HistoryPage() {
                       </span>
                       <span className="font-numeric text-small text-text-muted">
                         {order.updatedAt ? formatTime(order.updatedAt) : '—'}
-                      </span>
-                      <span>
-                        <StatusBadge status={order.status} />
                       </span>
                     </button>
                   ))}

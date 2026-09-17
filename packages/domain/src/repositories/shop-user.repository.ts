@@ -17,7 +17,9 @@ export class ShopUserRepository {
         s.id    AS shop_id,
         s.name  AS shop_name,
         s.is_active AS shop_is_active,
-        s.inventory_mode
+        s.inventory_mode,
+        to_char(s.opening_time, 'HH24:MI') AS opening_time,
+        to_char(s.closing_time, 'HH24:MI') AS closing_time
       FROM shop_user su
       JOIN shop s ON s.id = su.shop_id
       WHERE su.username = $1 AND su.is_active = true`,

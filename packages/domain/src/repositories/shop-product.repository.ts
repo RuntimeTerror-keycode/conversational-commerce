@@ -75,6 +75,26 @@ export class ShopProductRepository {
     return result.rows[0] ?? { total: 0, inStock: 0, low: 0, out: 0 };
   }
 
+  /**
+   * Every category this shop actually stocks, so the dashboard's filter
+   * dropdown can list them. Derived from the shop's own rows rather than the
+   * whole category table — offering "Dairy" to a shop that sells no dairy is
+   * a filter that can only ever return nothing.
+   */
+  public async categoriesForShop(shopId: number): Promise<string[]> {
+    const result = await this.db.query<{ name: string }>(
+      `SELECT DISTINCT cg.name
+       FROM shop_product sp
+       JOIN catalog cat ON cat.id = sp.catalog_id
+       JOIN category cg ON cg.id = cat.category_id
+       WHERE sp.shop_id = $1
+       ORDER BY cg.name`,
+      [shopId],
+    );
+
+    return result.rows.map((row) => row.name);
+  }
+
   public async exists(productId: number, shopId: number): Promise<boolean> {
     const result = await this.db.query<IdRow>(
       'SELECT id FROM shop_product WHERE id = $1 AND shop_id = $2',
@@ -104,6 +124,94 @@ export class ShopProductRepository {
     );
 
     return result.rows[0];
+  }
+
+  /** Catalogue search for the "add product" picker. */
+  public async searchCatalog(shopId: number, q: string | undefined, limit: number) {
+    const params: unknown[] = [shopId];
+    let where = '';
+
+    if (q) {
+      params.push(q);
+      where = `WHERE (cat.name ILIKE '%' || $2 || '%'
+                 OR cat.brand ILIKE '%' || $2 || '%'
+                 OR cat.sku ILIKE '%' || $2 || '%')`;
+    }
+
+    params.push(limit);
+
+    const result = await this.db.query<{
+      catalog_id: number;
+      name: string;
+      brand: string | null;
+      category: string | null;
+      unit: string | null;
+      sku: string | null;
+      already_stocked: boolean;
+    }>(
+      `SELECT cat.id AS catalog_id, cat.name, cat.brand, cg.name AS category,
+              cat.unit, cat.sku,
+              EXISTS (
+                SELECT 1 FROM shop_product sp
+                WHERE sp.shop_id = $1 AND sp.catalog_id = cat.id
+              ) AS already_stocked
+       FROM catalog cat
+       LEFT JOIN category cg ON cg.id = cat.category_id
+       ${where}
+       ORDER BY cat.name
+       LIMIT $${params.length}`,
+      params,
+    );
+
+    return result.rows;
+  }
+
+  public async insertForShop(
+    shopId: number,
+    catalogId: number,
+    values: {
+      localName: string | null;
+      regularPrice: number;
+      sellingPrice: number;
+      stockQuantity: number;
+      lowStockThreshold: number;
+    },
+  ): Promise<number> {
+    const result = await this.db.query<{ id: number }>(
+      `INSERT INTO shop_product
+         (shop_id, catalog_id, local_name, regular_price, selling_price,
+          stock_quantity, low_stock_threshold, is_available, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $6 > 0, NOW())
+       RETURNING id`,
+      [
+        shopId,
+        catalogId,
+        values.localName,
+        values.regularPrice,
+        values.sellingPrice,
+        values.stockQuantity,
+        values.lowStockThreshold,
+      ],
+    );
+
+    return result.rows[0].id;
+  }
+
+  /** How many historical order lines reference this product. */
+  public async orderLineCount(productId: number): Promise<number> {
+    const result = await this.db.query<{ count: string }>(
+      'SELECT COUNT(*)::text AS count FROM order_item WHERE shop_product_id = $1',
+      [productId],
+    );
+
+    return parseInt(result.rows[0].count, 10);
+  }
+
+  public async deleteForShop(productId: number, shopId: number): Promise<void> {
+    await this.db.query('DELETE FROM shop_product WHERE id = $1 AND shop_id = $2', [
+      productId,
+      shopId,
+    ]);
   }
 
   public async findCatalog(catalogId: number): Promise<ShopCatalogRow> {

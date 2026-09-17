@@ -25,17 +25,27 @@ const nextStep: Record<FulfillmentStatus, DashboardTransition | null> = {
   rejected: null,
 };
 
-const actionLabels: Record<DashboardTransition, string> = {
-  packed: 'Mark packed',
-  out_for_delivery: 'Out for delivery',
-  delivered: 'Mark delivered',
+/**
+ * A pickup order walks the same four statuses — the API's transition table has
+ * no branch for it — but `out_for_delivery` means "waiting on the counter" and
+ * `delivered` means "the customer took it". Only the wording differs.
+ */
+const actionLabels: Record<DashboardTransition, { delivery: string; pickup: string }> = {
+  packed: { delivery: 'Mark packed', pickup: 'Mark packed' },
+  out_for_delivery: { delivery: 'Hand to delivery', pickup: 'Ready for pickup' },
+  delivered: { delivery: 'Mark delivered', pickup: 'Mark collected' },
 };
 
 export function nextAction(
   status: FulfillmentStatus,
+  deliveryType?: string,
 ): { status: DashboardTransition; label: string } | null {
   const next = nextStep[status];
-  return next ? { status: next, label: actionLabels[next] } : null;
+  if (!next) return null;
+  return {
+    status: next,
+    label: actionLabels[next][deliveryType === 'pickup' ? 'pickup' : 'delivery'],
+  };
 }
 
 export function stepIndex(status: FulfillmentStatus): number {
