@@ -19,8 +19,7 @@ logger = logging.getLogger("edge.webhook")
 router = APIRouter()
 
 
-def process_webhook(data: dict) -> None:
-    """Original WhatsApp inbound handling — no agent call."""
+async def process_webhook(data: dict) -> None:
     try:
         value = data["entry"][0]["changes"][0]["value"]
 
@@ -40,9 +39,9 @@ def process_webhook(data: dict) -> None:
         logger.info("Sender=%s type=%s", sender, message_type)
 
         if message_type == "text":
-            handle_text_message(message, sender)
+            await handle_text_message(message, sender)
         elif message_type == "audio":
-            handle_audio_message(message, sender)
+            await handle_audio_message(message, sender)
         elif message_type == "location":
             handle_location_message(message, sender)
         elif message_type == "interactive":

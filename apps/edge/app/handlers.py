@@ -1,3 +1,5 @@
+import uuid
+
 from app.content import messages
 from app.services.addresses import save_address
 from app.services.audio import transcribe_audio, transcribe_audio_bytes
@@ -11,11 +13,56 @@ from app.services.orders import (
 )
 from app.services.whatsapp import (
     send_text,
+    send_whatsapp_list,
+    send_whatsapp_poll,
     react_to_message,
 )
 
+from edge.agent_client import call_agent_turn
+from edge.config import get_settings
+from edge.contracts import AgentTurnRequest
 
-def handle_text(sender, text):
+
+def render_reply_blocks(sender, blocks):
+
+    for block in blocks:
+
+        if block.type == "text":
+            send_text(destination=sender, text=block.body)
+
+        elif block.type == "buttons":
+            send_whatsapp_poll(
+                destination=sender,
+                question=block.body,
+                options=[
+                    {"id": button.id, "title": button.label}
+                    for button in block.buttons
+                ],
+            )
+
+        elif block.type == "list":
+            send_whatsapp_list(
+                destination=sender,
+                body=block.body,
+                rows=[
+                    {"id": row.id, "title": row.title, "description": row.description}
+                    for row in block.rows
+                ],
+                header=block.header,
+            )
+
+        elif block.type == "cart_summary":
+            lines = "\n".join(
+                f"- {item.productName} x{item.quantity} {item.unit} — ₹{item.price}"
+                for item in block.items
+            )
+            send_text(
+                destination=sender,
+                text=f"{lines}\n\nTotal: ₹{block.total}",
+            )
+
+
+async def handle_text(sender, text, message_id=None):
 
     print("User message:", text)
 
@@ -27,19 +74,33 @@ def handle_text(sender, text):
         )
         return {"action": "address"}
 
-    send_text(
-        destination=sender,
-        text=messages.echo_text(text)
+    settings = get_settings()
+    request = AgentTurnRequest(
+        traceId=str(uuid.uuid4()),
+        messageId=message_id or str(uuid.uuid4()),
+        customerRef=sender,
+        text=text,
+        source="text",
+        locale=None,
     )
 
-    return {"action": "echo"}
+    try:
+        response = await call_agent_turn(request, settings)
+    except Exception:
+        send_text(destination=sender, text=messages.AGENT_TROUBLE)
+        return {"action": "agent_error"}
+
+    render_reply_blocks(sender, response.blocks)
+
+    return {"action": "agent_turn", "sessionState": response.sessionState}
 
 
-def handle_text_message(message, sender):
+async def handle_text_message(message, sender):
 
-    return handle_text(
+    return await handle_text(
         sender,
-        message["text"]["body"]
+        message["text"]["body"],
+        message.get("id"),
     )
 
 
@@ -165,36 +226,7 @@ def handle_order_confirmation_reply(sender, option_id, poll_message_id):
     }
 
 
-def send_transcription_replies(sender, result):
-
-    if result:
-
-        original = (result.get("original") or "").strip()
-        english = (result.get("english") or "").strip()
-
-        send_text(
-            destination=sender,
-            text=messages.voice_original_reply(original)
-        )
-
-        if english:
-
-            send_text(
-                destination=sender,
-                text=messages.voice_english_reply(english)
-            )
-
-        return True
-
-    send_text(
-        destination=sender,
-        text=messages.AUDIO_NOT_UNDERSTOOD
-    )
-
-    return False
-
-
-def handle_audio(sender, media_id=None, message_id=None, audio_bytes=None, suffix=".ogg"):
+async def handle_audio(sender, media_id=None, message_id=None, audio_bytes=None, suffix=".ogg"):
 
     if message_id:
 
@@ -209,26 +241,64 @@ def handle_audio(sender, media_id=None, message_id=None, audio_bytes=None, suffi
     else:
         result = transcribe_audio(media_id)
 
-    understood = send_transcription_replies(sender, result)
+    if not result:
 
-    if message_id:
-
-        react_to_message(
+        send_text(
             destination=sender,
-            message_id=message_id,
-            emoji="✅"
+            text=messages.AUDIO_NOT_UNDERSTOOD
         )
 
+        if message_id:
+            react_to_message(destination=sender, message_id=message_id, emoji="✅")
+
+        return {"action": "audio", "understood": False, "result": None}
+
+    original = (result.get("original") or "").strip()
+    english = (result.get("english") or "").strip()
+    language_code = result.get("language_code")
+
+    # Show what we heard — proof the STT worked, and lets the customer
+    # correct course if the transcript is wrong.
+    send_text(
+        destination=sender,
+        text=messages.voice_original_reply(original)
+    )
+
+    settings = get_settings()
+    request = AgentTurnRequest(
+        traceId=str(uuid.uuid4()),
+        messageId=message_id or str(uuid.uuid4()),
+        customerRef=sender,
+        text=english or original,
+        source="voice",
+        locale=language_code,
+    )
+
+    try:
+        response = await call_agent_turn(request, settings)
+    except Exception:
+        send_text(destination=sender, text=messages.AGENT_TROUBLE)
+
+        if message_id:
+            react_to_message(destination=sender, message_id=message_id, emoji="✅")
+
+        return {"action": "agent_error", "result": result}
+
+    render_reply_blocks(sender, response.blocks)
+
+    if message_id:
+        react_to_message(destination=sender, message_id=message_id, emoji="✅")
+
     return {
-        "action": "audio",
-        "understood": understood,
-        "result": result
+        "action": "agent_turn",
+        "sessionState": response.sessionState,
+        "result": result,
     }
 
 
-def handle_audio_message(message, sender):
+async def handle_audio_message(message, sender):
 
-    return handle_audio(
+    return await handle_audio(
         sender=sender,
         media_id=message["audio"]["id"],
         message_id=message["id"]
