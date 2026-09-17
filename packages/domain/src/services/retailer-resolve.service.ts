@@ -20,10 +20,7 @@ export class RetailerResolveService {
   }
 
   public async resolve(customerRef: string): Promise<ResolveRetailerResponse> {
-    const customer = await this.customerRepo.findWithDefaultAddress(customerRef);
-    if (!customer) {
-      throw AppError.notFound('Customer not found');
-    }
+    const customer = await this.getOrCreateCustomer(customerRef);
 
     const shops = await this.shopRepo.findAllActiveWithLocation();
 
@@ -56,14 +53,30 @@ export class RetailerResolveService {
   }
 
   public async resolveNearbyShopIds(customerPhone: string): Promise<number[]> {
-    const customer = await this.customerRepo.findWithDefaultAddress(customerPhone);
-    if (!customer) {
-      throw AppError.notFound('Customer not found');
-    }
+    const customer = await this.getOrCreateCustomer(customerPhone);
 
     const shops = await this.shopRepo.findAllActiveWithLocation();
     const nearby = this.rankByDistance(customer.latitude, customer.longitude, shops);
     return nearby.map((s) => parseInt(s.retailerId, 10));
+  }
+
+  /**
+   * WhatsApp senders are not pre-registered — the first message from a brand
+   * new phone number must still resolve a retailer. Create the customer row
+   * on first contact instead of 404ing; they simply have no address yet
+   * (handled downstream: requestOrderConfirmation surfaces a null
+   * deliveryAddress and the agent asks for one before placing an order).
+   */
+  private async getOrCreateCustomer(customerRef: string) {
+    const existing = await this.customerRepo.findWithDefaultAddress(customerRef);
+    if (existing) return existing;
+
+    await this.customerRepo.findOrCreateByPhone(customerRef);
+    const created = await this.customerRepo.findWithDefaultAddress(customerRef);
+    if (!created) {
+      throw AppError.notFound('Customer not found');
+    }
+    return created;
   }
 
   private rankByDistance(

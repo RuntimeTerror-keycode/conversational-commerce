@@ -24,16 +24,6 @@ AUDIO_NOT_UNDERSTOOD = (
 )
 
 
-def location_with_address(address, latitude, longitude):
-
-    return (
-        "Location received!\n\n"
-        f"Address:\n{address}\n\n"
-        f"Latitude: {latitude}\n"
-        f"Longitude: {longitude}"
-    )
-
-
 def location_without_address(latitude, longitude):
 
     return (

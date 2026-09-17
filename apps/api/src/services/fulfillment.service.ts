@@ -228,6 +228,19 @@ export class FulfillmentService {
       await this.notifyService.send(detail.customer.phone, [{ type: 'text', body }], 'out_for_delivery', detail.traceId);
     }
 
+    if (targetStatus === 'delivered') {
+      const shop = await this.shopRepo.findById(shopId);
+      const shopName = shop?.name ?? 'the shop';
+      const body = [
+        '📦 *Delivered!*',
+        `Your order \`${detail.orderCode}\` from *${shopName}* has been delivered.`,
+        '',
+        'Thanks for shopping with us — enjoy! 🛍️',
+      ].join('\n');
+
+      await this.notifyService.send(detail.customer.phone, [{ type: 'text', body }], 'delivered', detail.traceId);
+    }
+
     return detail;
   }
 

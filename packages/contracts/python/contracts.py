@@ -61,7 +61,7 @@ class NotifyRequest(BaseModel):
     traceId: str
     customerRef: str
     blocks: list[ReplyBlock] = Field(max_length=2)
-    reason: Literal["order_accepted", "order_rejected", "out_for_delivery", "substitution"]
+    reason: Literal["order_accepted", "order_rejected", "out_for_delivery", "delivered", "substitution"]
 
 
 # ---------------------------------------------------------------------------

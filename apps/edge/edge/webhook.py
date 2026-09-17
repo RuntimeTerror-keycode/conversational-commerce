@@ -43,9 +43,9 @@ async def process_webhook(data: dict) -> None:
         elif message_type == "audio":
             await handle_audio_message(message, sender)
         elif message_type == "location":
-            handle_location_message(message, sender)
+            await handle_location_message(message, sender)
         elif message_type == "interactive":
-            handle_interactive_message(message, sender)
+            await handle_interactive_message(message, sender)
         else:
             handle_unknown_message(message_type, sender)
 

@@ -91,6 +91,7 @@ export class OrderPlacementService {
 
     const customerAddress = await this.customerRepo.findWithDefaultAddress(customerId);
     const addressId = customerAddress?.address_id ?? 0;
+    const deliveryAddress = this.formatAddress(customerAddress);
 
     const cartHash = this.computeCartHash(cartItems);
 
@@ -142,7 +143,18 @@ export class OrderPlacementService {
       confirmationToken: token,
       expiresAt: expiresAt.toISOString(),
       shopBreakdown,
+      deliveryAddress,
     };
+  }
+
+  private formatAddress(
+    address: { label: string | null; address_line: string | null; city: string | null } | null,
+  ): string | null {
+    if (!address) return null;
+    const parts = [address.label, address.address_line, address.city].filter(
+      (part): part is string => Boolean(part && part.trim()),
+    );
+    return parts.length > 0 ? parts.join(', ') : null;
   }
 
   /**

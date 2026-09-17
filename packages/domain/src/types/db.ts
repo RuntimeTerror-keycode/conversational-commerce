@@ -13,6 +13,8 @@ export interface CustomerRow {
 
 export interface CustomerWithAddressRow extends CustomerRow {
   address_id: number | null;
+  address_line: string | null;
+  label: string | null;
   latitude: number | null;
   longitude: number | null;
   city: string | null;

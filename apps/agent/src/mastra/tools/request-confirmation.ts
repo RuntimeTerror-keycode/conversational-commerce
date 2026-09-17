@@ -15,7 +15,7 @@ const CartLine = z.object({
 export const requestOrderConfirmation = createTool({
   id: "requestOrderConfirmation",
   description:
-    "Get the final priced summary and a short-lived confirmation token before placing an order. Call this before placeOrder, never skip it. If shopBreakdown has more than one entry, tell the customer which shops will pack the order.",
+    "Get the final priced summary and a short-lived confirmation token before placing an order. Call this before placeOrder, never skip it. If shopBreakdown has more than one entry, tell the customer which shops will pack the order. Always state deliveryAddress in the summary so the customer can catch a wrong address before confirming — if it's null, ask the customer for their delivery address instead of assuming one.",
   inputSchema: z.object({}),
   outputSchema: z.union([
     z.object({
@@ -31,6 +31,7 @@ export const requestOrderConfirmation = createTool({
           subtotal: z.number(),
         }),
       ),
+      deliveryAddress: z.string().nullable(),
     }),
     z.object({ error: z.literal(true), reason: z.string() }),
   ]),

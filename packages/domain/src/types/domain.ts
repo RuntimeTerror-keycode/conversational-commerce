@@ -86,6 +86,7 @@ export interface OrderConfirmationResponse {
   confirmationToken: string;
   expiresAt: string;
   shopBreakdown: ShopBreakdownEntry[];
+  deliveryAddress: string | null;
 }
 
 // ---------------------------------------------------------------------------

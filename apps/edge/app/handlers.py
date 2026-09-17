@@ -62,17 +62,13 @@ def render_reply_blocks(sender, blocks):
             )
 
 
-async def handle_text(sender, text, message_id=None):
+async def forward_to_agent(sender, text, message_id=None, source="text", locale=None):
+    """Send one turn to apps/agent and render whatever it replies with.
 
-    print("User message:", text)
-
-    if is_awaiting_address(sender):
-
-        complete_checkout_with_address(
-            sender,
-            (text or "").strip()
-        )
-        return {"action": "address"}
+    Shared by every message type (text, voice, location, interactive) so a
+    customer's input is never silently swallowed by a static reply — it
+    always reaches the real conversational agent.
+    """
 
     settings = get_settings()
     request = AgentTurnRequest(
@@ -80,8 +76,8 @@ async def handle_text(sender, text, message_id=None):
         messageId=message_id or str(uuid.uuid4()),
         customerRef=sender,
         text=text,
-        source="text",
-        locale=None,
+        source=source,
+        locale=locale,
     )
 
     try:
@@ -95,6 +91,21 @@ async def handle_text(sender, text, message_id=None):
     return {"action": "agent_turn", "sessionState": response.sessionState}
 
 
+async def handle_text(sender, text, message_id=None):
+
+    print("User message:", text)
+
+    if is_awaiting_address(sender):
+
+        complete_checkout_with_address(
+            sender,
+            (text or "").strip()
+        )
+        return {"action": "address"}
+
+    return await forward_to_agent(sender, text, message_id=message_id, source="text")
+
+
 async def handle_text_message(message, sender):
 
     return await handle_text(
@@ -104,7 +115,7 @@ async def handle_text_message(message, sender):
     )
 
 
-def handle_interactive(
+async def handle_interactive(
     sender,
     option_id,
     option_title="",
@@ -129,15 +140,18 @@ def handle_interactive(
     if handle_address_choice(sender, option_id):
         return {"action": "address_choice"}
 
-    send_text(
-        destination=sender,
-        text=messages.poll_vote_thanks(option_title)
+    # Not one of the legacy demo flows above — this is a tap on something the
+    # agent itself sent (a buttons/list ReplyBlock). Treat it exactly like the
+    # customer typed the option's label, so the conversation continues.
+    return await forward_to_agent(
+        sender,
+        option_title or option_id,
+        message_id=poll_message_id,
+        source="text",
     )
 
-    return {"action": "thanks"}
 
-
-def handle_interactive_message(message, sender):
+async def handle_interactive_message(message, sender):
 
     interactive = message.get("interactive", {})
     interactive_type = interactive.get("type")
@@ -159,7 +173,7 @@ def handle_interactive_message(message, sender):
 
         return {"action": "thanks"}
 
-    return handle_interactive(
+    return await handle_interactive(
         sender=sender,
         option_id=reply.get("id", ""),
         option_title=reply.get("title", ""),
@@ -264,36 +278,18 @@ async def handle_audio(sender, media_id=None, message_id=None, audio_bytes=None,
         text=messages.voice_original_reply(original)
     )
 
-    settings = get_settings()
-    request = AgentTurnRequest(
-        traceId=str(uuid.uuid4()),
-        messageId=message_id or str(uuid.uuid4()),
-        customerRef=sender,
-        text=english or original,
+    turn_result = await forward_to_agent(
+        sender,
+        english or original,
+        message_id=message_id,
         source="voice",
         locale=language_code,
     )
 
-    try:
-        response = await call_agent_turn(request, settings)
-    except Exception:
-        send_text(destination=sender, text=messages.AGENT_TROUBLE)
-
-        if message_id:
-            react_to_message(destination=sender, message_id=message_id, emoji="✅")
-
-        return {"action": "agent_error", "result": result}
-
-    render_reply_blocks(sender, response.blocks)
-
     if message_id:
         react_to_message(destination=sender, message_id=message_id, emoji="✅")
 
-    return {
-        "action": "agent_turn",
-        "sessionState": response.sessionState,
-        "result": result,
-    }
+    return {**turn_result, "result": result}
 
 
 async def handle_audio_message(message, sender):
@@ -305,7 +301,7 @@ async def handle_audio_message(message, sender):
     )
 
 
-def handle_location(
+async def handle_location(
     sender,
     latitude,
     longitude,
@@ -354,14 +350,11 @@ def handle_location(
             "longitude": longitude
         }
 
-    if address:
-
-        save_address(sender, address)
+    if not address:
 
         send_text(
             destination=sender,
-            text=messages.location_with_address(
-                address,
+            text=messages.location_without_address(
                 latitude,
                 longitude
             )
@@ -369,32 +362,29 @@ def handle_location(
 
         return {
             "action": "location",
-            "address": address,
+            "address": None,
             "latitude": latitude,
             "longitude": longitude
         }
 
-    send_text(
-        destination=sender,
-        text=messages.location_without_address(
-            latitude,
-            longitude
-        )
+    save_address(sender, address)
+
+    # Let the agent acknowledge the shared location in conversation, instead
+    # of a static "Location received!" reply that goes nowhere.
+    turn_result = await forward_to_agent(
+        sender,
+        f"[Shared delivery location] {address}",
+        source="text",
     )
 
-    return {
-        "action": "location",
-        "address": None,
-        "latitude": latitude,
-        "longitude": longitude
-    }
+    return {**turn_result, "address": address, "latitude": latitude, "longitude": longitude}
 
 
-def handle_location_message(message, sender):
+async def handle_location_message(message, sender):
 
     location = message["location"]
 
-    return handle_location(
+    return await handle_location(
         sender=sender,
         latitude=location["latitude"],
         longitude=location["longitude"],

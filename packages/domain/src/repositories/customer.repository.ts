@@ -29,6 +29,8 @@ export class CustomerRepository {
       `SELECT
         c.id, c.phone, c.display_name, c.language,
         a.id AS address_id,
+        a.address_line,
+        a.label,
         a.latitude::float AS latitude,
         a.longitude::float AS longitude,
         a.city
