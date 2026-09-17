@@ -7,6 +7,8 @@ dist/
 __pycache__/
 .venv/
 *.db
+*.db-shm
+*.db-wal
 .DS_Store
 
 apps/api/package-lock.json
