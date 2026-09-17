@@ -1,14 +1,6 @@
-import { useEffect, type ReactNode } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { useForm } from 'react-hook-form';
-import { z } from 'zod';
-import { LogOut, Store } from 'lucide-react';
-import { changePassword, updateProfile } from '@/api/auth';
+import { useEffect, useState, type ReactNode } from 'react';
+import { Clock, LogOut, Store } from 'lucide-react';
 import { ApiRequestError } from '@/api/client';
-import { updateRetailer } from '@/api/stats';
-import { queryKeys } from '@/api/keys';
-import type { ChangePasswordRequest, ProfilePatch, Retailer } from '@/api/types';
 import { PageHeader } from '@/app/PageHeader';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -17,7 +9,9 @@ import { Panel, PanelHeader } from '@/components/ui/Panel';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { Toggle } from '@/components/ui/Toggle';
 import { useToast } from '@/components/ui/Toast';
-import { useLogout, useSession } from '@/features/auth/useSession';
+import { useSession, useSignOut } from '@/features/auth/useSession';
+import { formatHours, shopStatusMeta } from './shopStatus';
+import { useShopSettings, useUpdateShopSettings } from './useShopSettings';
 
 function Row({
   label,
@@ -39,213 +33,166 @@ function Row({
   );
 }
 
-/** Schema derived from ProfilePatch (src/api/types.ts) — empty string clears the field. */
-const profileSchema = z.object({
-  name: z.string().min(1, 'Name is required'),
-  email: z.union([z.literal(''), z.string().email('Enter a valid email')]),
-  phone: z.string(),
-}) satisfies z.ZodType<{ name: string; email: string; phone: string }>;
-
-type ProfileForm = z.infer<typeof profileSchema>;
-
-function ProfileForm({ name, email, phone }: { name: string; email: string | null; phone: string | null }) {
-  const queryClient = useQueryClient();
-  const toast = useToast();
-  const {
-    register,
-    handleSubmit,
-    reset,
-    formState: { errors },
-  } = useForm<ProfileForm>({
-    resolver: zodResolver(profileSchema),
-    defaultValues: { name, email: email ?? '', phone: phone ?? '' },
-  });
-
-  useEffect(
-    () => reset({ name, email: email ?? '', phone: phone ?? '' }),
-    [name, email, phone, reset],
-  );
-
-  const save = useMutation({
-    mutationFn: (patch: ProfilePatch) => updateProfile(patch),
-    onSuccess: (session) => {
-      queryClient.setQueryData(queryKeys.session, session);
-      toast('Profile updated', 'success');
-    },
-    onError: () => toast('Could not save your profile.', 'error'),
-  });
-
-  const onSubmit = handleSubmit((values) =>
-    save.mutate({ name: values.name, email: values.email || null, phone: values.phone || null }),
-  );
-
-  return (
-    <form onSubmit={onSubmit} noValidate className="flex flex-col gap-4 px-4 py-4">
-      <Input label="Name" error={errors.name?.message} {...register('name')} />
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <Input label="Email" type="email" error={errors.email?.message} {...register('email')} />
-        <Input label="Phone" inputMode="tel" error={errors.phone?.message} {...register('phone')} />
-      </div>
-      <Button type="submit" variant="secondary" className="self-start" loading={save.isPending}>
-        Save profile
-      </Button>
-    </form>
-  );
-}
-
-/** Schema derived from ChangePasswordRequest, plus a UI-only confirm field. */
-const passwordSchema = z
-  .object({
-    currentPassword: z.string().min(1, 'Enter your current password'),
-    newPassword: z.string().min(8, 'New password must be at least 8 characters'),
-    confirm: z.string(),
-  })
-  .refine((data) => data.newPassword === data.confirm, {
-    message: 'New passwords do not match',
-    path: ['confirm'],
-  }) satisfies z.ZodType<ChangePasswordRequest & { confirm: string }>;
-
-type PasswordFormValues = z.infer<typeof passwordSchema>;
-
-function PasswordForm() {
-  const toast = useToast();
-  const {
-    register,
-    handleSubmit,
-    reset,
-    setError,
-    formState: { errors },
-  } = useForm<PasswordFormValues>({
-    resolver: zodResolver(passwordSchema),
-    defaultValues: { currentPassword: '', newPassword: '', confirm: '' },
-  });
-
-  const save = useMutation({
-    mutationFn: (body: ChangePasswordRequest) => changePassword(body),
-    onSuccess: () => {
-      reset();
-      toast('Password changed', 'success');
-    },
-    onError: (mutationError) => {
-      setError('currentPassword', {
-        message:
-          mutationError instanceof ApiRequestError
-            ? mutationError.message
-            : 'Could not change your password.',
-      });
-    },
-  });
-
-  const onSubmit = handleSubmit((values) =>
-    save.mutate({ currentPassword: values.currentPassword, newPassword: values.newPassword }),
-  );
-
-  return (
-    <form onSubmit={onSubmit} noValidate className="flex flex-col gap-4 px-4 py-4">
-      <Input
-        label="Current password"
-        type="password"
-        autoComplete="current-password"
-        error={errors.currentPassword?.message}
-        {...register('currentPassword')}
-      />
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <Input
-          label="New password"
-          type="password"
-          autoComplete="new-password"
-          error={errors.newPassword?.message}
-          {...register('newPassword')}
-        />
-        <Input
-          label="Confirm new password"
-          type="password"
-          autoComplete="new-password"
-          error={errors.confirm?.message}
-          {...register('confirm')}
-        />
-      </div>
-      <Button type="submit" variant="secondary" className="self-start" loading={save.isPending}>
-        Change password
-      </Button>
-    </form>
-  );
-}
-
 export function SettingsPage() {
   const session = useSession();
-  const queryClient = useQueryClient();
-  const logoutMutation = useLogout();
+  const signOut = useSignOut();
   const toast = useToast();
+  const { data: shop, isPending } = useShopSettings();
+  const save = useUpdateShopSettings();
 
-  const save = useMutation({
-    mutationFn: (patch: Partial<Retailer>) => updateRetailer(patch),
-    onSuccess: (retailer) => {
-      void queryClient.invalidateQueries({ queryKey: queryKeys.session });
-      toast(retailer.shopOpen ? 'Shop is taking orders' : 'Shop is closed', 'success');
-    },
-    onError: () => toast('Could not save that setting.', 'error'),
-  });
+  const [opening, setOpening] = useState('');
+  const [closing, setClosing] = useState('');
+  const [name, setName] = useState('');
+  const [owner, setOwner] = useState('');
 
-  if (!session.data) {
+  // Mirror the server values until the shopkeeper starts editing them.
+  useEffect(() => {
+    if (!shop) return;
+    setOpening(shop.openingTime ?? '');
+    setClosing(shop.closingTime ?? '');
+    setName(shop.name);
+    setOwner(shop.ownerName ?? '');
+  }, [shop?.openingTime, shop?.closingTime, shop?.name, shop?.ownerName]);
+
+  const onError = (error: unknown) => {
+    toast(
+      error instanceof ApiRequestError ? error.message : 'Could not save that setting.',
+      'error',
+    );
+  };
+
+  if (isPending || !shop || !session.data) {
     return (
       <>
         <PageHeader title="Settings" />
-        <div className="mx-auto max-w-content px-4 py-6 md:px-8">
-          <Skeleton className="h-72 max-w-2xl rounded-xl" />
+        <div className="max-w-2xl px-4 pb-[30px] md:px-9">
+          <Skeleton className="h-96 rounded-xl" />
         </div>
       </>
     );
   }
 
-  const { retailer, user } = session.data;
+  const status = shopStatusMeta[shop.openState];
+  const savedHours = formatHours(shop.openingTime, shop.closingTime);
+
+  const rightNow = [
+    shop.openState === 'offline'
+      ? 'Switched off — not taking orders'
+      : shop.openState === 'closed'
+        ? `Closed now${shop.openingTime ? ` · reopens ${shop.openingTime}` : ''}`
+        : savedHours
+          ? `Open · ${savedHours}`
+          : 'Open · no hours set, so always taking orders',
+    shop.inventoryMode === 'managed'
+      ? 'inventory managed here'
+      : 'inventory synced from your billing system',
+  ].join(' · ');
+  const hoursDirty =
+    opening !== (shop.openingTime ?? '') || closing !== (shop.closingTime ?? '');
+
+  const detailsDirty = name !== shop.name || owner !== (shop.ownerName ?? '');
+
+  const saveDetails = () => {
+    if (name.trim().length === 0) {
+      toast('Shop name cannot be empty.', 'error');
+      return;
+    }
+
+    save.mutate(
+      { name: name.trim(), ownerName: owner.trim() || null },
+      { onSuccess: () => toast('Shop details updated', 'success'), onError },
+    );
+  };
+
+  const saveHours = () => {
+    // Both or neither — a shop with only a closing time has no meaningful
+    // open/closed state, and the API rejects it anyway.
+    if (Boolean(opening) !== Boolean(closing)) {
+      toast('Set both an opening and a closing time, or clear both.', 'error');
+      return;
+    }
+
+    save.mutate(
+      { openingTime: opening || null, closingTime: closing || null },
+      {
+        onSuccess: () => toast('Opening hours updated', 'success'),
+        onError,
+      },
+    );
+  };
+
+  const clearHours = () => {
+    save.mutate(
+      { openingTime: null, closingTime: null },
+      { onSuccess: () => toast('Opening hours cleared', 'success'), onError },
+    );
+  };
 
   return (
     <>
-      <PageHeader title="Settings" subtitle="Shop details and how orders reach you" />
+      <PageHeader eyebrow="Your shop" title="Settings" />
 
-      <div className="mx-auto flex max-w-2xl flex-col gap-4 px-4 py-6 md:px-8">
+      <div className="flex max-w-2xl flex-col gap-[22px] px-4 pb-[30px] md:px-9">
         <Panel>
           <div className="flex items-center gap-3 border-b border-border px-4 py-4">
             <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-accent text-white">
               <Store className="size-5" aria-hidden />
             </div>
-            <div className="min-w-0">
-              <p className="text-h3">{retailer.name}</p>
-              <p className="text-small text-text-muted">{retailer.area}</p>
+            <div className="min-w-0 flex-1">
+              <p className="text-h3">{shop.name}</p>
+              <p className="text-small text-text-muted">
+                {shop.ownerName ? `${shop.ownerName} · ` : ''}
+                <span className="font-numeric">{shop.phone}</span>
+              </p>
             </div>
+            <Badge tone={status.tone} icon={status.icon}>{status.label}</Badge>
           </div>
 
-          <Row label="WhatsApp number" hint="Customers place orders on this number">
-            <span className="font-numeric text-body">{retailer.whatsappNumber ?? '—'}</span>
+          <Row label="Current status" hint={status.hint}>
+            <span className="font-numeric text-small text-text-secondary">
+              {savedHours ?? 'No hours set'}
+            </span>
           </Row>
 
           <Row
             label="Inventory"
             hint={
-              retailer.inventoryMode === 'managed'
+              shop.inventoryMode === 'managed'
                 ? 'Managed here — stock comes down automatically as orders arrive'
                 : 'Synced from your own billing system, read-only in this portal'
             }
           >
-            <Badge tone={retailer.inventoryMode === 'managed' ? 'info' : 'neutral'}>
-              {retailer.inventoryMode === 'managed' ? 'Managed here' : 'Synced'}
+            <Badge tone={shop.inventoryMode === 'managed' ? 'info' : 'neutral'}>
+              {shop.inventoryMode === 'managed' ? 'Managed here' : 'Synced'}
             </Badge>
           </Row>
         </Panel>
 
         <Panel>
-          <PanelHeader title="Orders" />
+          <PanelHeader title="Taking orders" />
 
           <Row
-            label="Taking orders"
-            hint="Turn this off and the assistant tells customers the shop is closed"
+            label="Shop is online"
+            hint={
+              shop.isActive
+                ? 'Turn this off to stop new WhatsApp orders. Orders already in flight stay in your list.'
+                : 'Customers are told the shop is closed. You can still pack existing orders.'
+            }
           >
             <Toggle
-              checked={retailer.shopOpen}
-              label="Taking orders"
+              checked={shop.isActive}
+              label="Shop is online"
               disabled={save.isPending}
-              onChange={(shopOpen) => save.mutate({ shopOpen })}
+              onChange={(isActive) =>
+                save.mutate(
+                  { isActive },
+                  {
+                    onSuccess: () =>
+                      toast(isActive ? 'Shop is online' : 'Shop is offline', 'success'),
+                    onError,
+                  },
+                )
+              }
             />
           </Row>
 
@@ -255,32 +202,163 @@ export function SettingsPage() {
           >
             <Badge tone="success">On</Badge>
           </Row>
+
+          {/*
+            Which state fixes itself is the only thing that separates these,
+            and it is the thing a shopkeeper needs at 9am when orders are not
+            arriving. Spelled out rather than implied by a colour.
+          */}
+          <div className="border-t border-border bg-surface-sunken px-4 py-4">
+            <p className="text-caption text-text-muted uppercase">
+              The three states, and which one fixes itself
+            </p>
+
+            <dl className="mt-3 flex flex-col gap-2.5">
+              {[
+                {
+                  term: 'Open',
+                  detail: 'Inside opening hours and switched on.',
+                  strong: null,
+                },
+                {
+                  term: 'Closed now',
+                  detail: 'Outside your hours.',
+                  strong: shop.openingTime
+                    ? `Reopens by itself at ${shop.openingTime} — nothing to do.`
+                    : 'Reopens by itself — nothing to do.',
+                },
+                {
+                  term: 'Switched off',
+                  detail: 'You turned it off.',
+                  strong: 'Stays off until you turn it back on, even in opening hours.',
+                },
+              ].map((state) => (
+                <div key={state.term} className="flex gap-2.5 text-small">
+                  <dt className="w-24 shrink-0 font-semibold text-text">{state.term}</dt>
+                  <dd className="text-text-secondary">
+                    {state.detail}
+                    {state.strong ? (
+                      <span className="text-text"> {state.strong}</span>
+                    ) : null}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+
+            <p className="mt-3.5 border-t border-border pt-3 text-small text-text-muted">
+              Only you see this. Customers are never shown whether the shop is open —
+              the assistant simply stops taking their orders. Orders already in flight
+              can still be packed and handed over.
+            </p>
+          </div>
         </Panel>
 
         <Panel>
-          <PanelHeader title="Profile" />
-          <ProfileForm name={user.name} email={user.email} phone={user.phone} />
+          <PanelHeader
+            title="Opening hours"
+            action={
+              savedHours ? (
+                <button
+                  type="button"
+                  onClick={clearHours}
+                  disabled={save.isPending}
+                  className="text-small font-medium text-text-secondary transition-colors hover:text-text disabled:opacity-50"
+                >
+                  Clear
+                </button>
+              ) : null
+            }
+          />
+
+          <div className="flex flex-col gap-4 px-4 py-4">
+            <p className="flex items-start gap-2 text-small text-text-muted">
+              <Clock className="mt-0.5 size-3.5 shrink-0" aria-hidden />
+              <span>
+                Outside these hours the shop shows as closed and stops taking orders,
+                without you having to switch it off. Leave them blank to stay open
+                around the clock. An overnight window like 22:00 – 06:00 works.
+              </span>
+            </p>
+
+            <div className="grid grid-cols-2 gap-3">
+              <Input
+                label="Opens at"
+                type="time"
+                value={opening}
+                onChange={(event) => setOpening(event.target.value)}
+              />
+              <Input
+                label="Closes at"
+                type="time"
+                value={closing}
+                onChange={(event) => setClosing(event.target.value)}
+              />
+            </div>
+
+            <Button
+              variant="primary"
+              className="self-start"
+              disabled={!hoursDirty}
+              loading={save.isPending}
+              onClick={saveHours}
+            >
+              Save hours
+            </Button>
+          </div>
         </Panel>
 
         <Panel>
-          <PanelHeader title="Password" />
-          <PasswordForm />
+          <PanelHeader title="Shop" />
+
+          <div className="flex flex-col gap-4 px-4 py-4">
+            <Input
+              label="Shop name"
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+            />
+            <Input
+              label="Owner"
+              value={owner}
+              onChange={(event) => setOwner(event.target.value)}
+            />
+            {/*
+              No "Town" field: location lives in the separate shop_address
+              table, not on `shop`, so there is nothing here to write to.
+            */}
+            <Button
+              variant="primary"
+              className="self-start"
+              disabled={!detailsDirty}
+              loading={save.isPending}
+              onClick={saveDetails}
+            >
+              Save shop details
+            </Button>
+          </div>
         </Panel>
 
         <Panel>
           <PanelHeader title="Account" />
 
-          <Row label={user.name} hint={user.role === 'owner' ? 'Shop owner' : 'Staff'}>
+          <Row
+            label={`Signed in as ${session.data.user.username}`}
+            hint="There is no password on this account. Sign out if you are leaving this device at the counter."
+          >
             <Button
               variant="secondary"
-              loading={logoutMutation.isPending}
-              onClick={() => logoutMutation.mutate()}
+              loading={signOut.isPending}
+              onClick={() => signOut.mutate()}
             >
               <LogOut className="size-3.5" aria-hidden />
               Sign out
             </Button>
           </Row>
         </Panel>
+
+        <div className="rounded-lg border border-border bg-surface-sunken px-4 py-3">
+          <p className="text-caption text-text-muted uppercase">Right now</p>
+          <p className="mt-1 text-small text-text-secondary">{rightNow}</p>
+        </div>
       </div>
     </>
   );

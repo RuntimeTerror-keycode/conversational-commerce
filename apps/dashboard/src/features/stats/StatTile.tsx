@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import type { ComponentType, ReactNode } from 'react';
 import { cn } from '@/lib/cn';
 import { Skeleton } from '@/components/ui/Skeleton';
 
@@ -6,25 +6,34 @@ interface StatTileProps {
   label: string;
   value: ReactNode;
   hint?: string;
+  icon: ComponentType<{ className?: string }>;
   /** `alert` is reserved for the one figure that means "act now". */
   tone?: 'default' | 'alert';
   onClick?: () => void;
   loading?: boolean;
 }
 
+/**
+ * Icon and caps label on one line, then the figure at 34px.
+ *
+ * Only the attention tile takes a fill — a row of five tinted boxes would make
+ * the one that matters invisible.
+ */
 export function StatTile({
   label,
   value,
   hint,
+  icon: Icon,
   tone = 'default',
   onClick,
   loading,
 }: StatTileProps) {
   if (loading) {
     return (
-      <div className="rounded-xl border border-border bg-surface px-4 py-3.5 shadow-xs">
-        <Skeleton className="h-3 w-20" />
-        <Skeleton className="mt-2.5 h-9 w-16" />
+      <div className="rounded-lg border border-border bg-surface px-4 py-3.5">
+        <Skeleton className="h-3 w-24" />
+        <Skeleton className="mt-3 h-8 w-14" />
+        <Skeleton className="mt-2 h-3 w-20" />
       </div>
     );
   }
@@ -36,17 +45,42 @@ export function StatTile({
     <Element
       {...(onClick ? { type: 'button' as const, onClick } : {})}
       className={cn(
-        'rounded-xl border bg-surface px-4 py-3.5 text-left shadow-xs',
-        'transition-all duration-150',
-        alert ? 'border-warning-border bg-warning-bg/40' : 'border-border',
-        onClick && 'hover:-translate-y-px hover:shadow-sm focus-visible:outline-none focus-visible:ring focus-visible:ring-border-focus focus-visible:ring-offset-2',
+        'flex flex-col gap-1.5 rounded-lg border px-4 py-3.5 text-left',
+        'transition-colors duration-[120ms]',
+        alert
+          ? 'border-warning-border bg-warning-bg'
+          : 'border-border bg-surface hover:bg-surface-hover',
       )}
     >
-      <p className="text-caption text-text-muted uppercase tracking-wide">{label}</p>
-      <p className={cn('font-numeric text-metric', alert ? 'text-warning-fg' : 'text-text')}>
+      <span
+        className={cn(
+          'flex items-center gap-1.5 text-caption tracking-[0.08em] uppercase',
+          alert ? 'text-warning-fg' : 'text-text-muted',
+        )}
+      >
+        <Icon className="size-3.5 shrink-0" aria-hidden />
+        {label}
+      </span>
+
+      <span
+        className={cn(
+          'font-numeric text-metric',
+          alert ? 'text-warning-fg' : 'text-text',
+        )}
+      >
         {value}
-      </p>
-      {hint ? <p className="mt-0.5 text-caption text-text-muted">{hint}</p> : null}
+      </span>
+
+      {hint ? (
+        <span
+          className={cn(
+            'text-xs',
+            alert ? 'text-warning-fg/80' : 'text-text-muted',
+          )}
+        >
+          {hint}
+        </span>
+      ) : null}
     </Element>
   );
 }

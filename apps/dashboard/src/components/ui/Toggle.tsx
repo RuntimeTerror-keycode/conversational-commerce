@@ -6,8 +6,6 @@ interface ToggleProps {
   onChange: (checked: boolean) => void;
   label: string;
   disabled?: boolean;
-  /** Off means "out of stock", which is a problem, not a neutral state. */
-  offTone?: 'neutral' | 'danger';
 }
 
 export function Toggle({
@@ -15,7 +13,6 @@ export function Toggle({
   onChange,
   label,
   disabled,
-  offTone = 'neutral',
 }: ToggleProps) {
   return (
     <Switch.Root
@@ -27,7 +24,7 @@ export function Toggle({
         'relative h-5 w-9 shrink-0 rounded-full transition-colors duration-200',
         'focus-visible:outline-none focus-visible:ring focus-visible:ring-border-focus focus-visible:ring-offset-2',
         'disabled:cursor-not-allowed disabled:opacity-50',
-        checked ? 'bg-success' : offTone === 'danger' ? 'bg-danger-border' : 'bg-border-strong',
+        checked ? 'bg-accent' : 'bg-border-strong',
       )}
     >
       <Switch.Thumb

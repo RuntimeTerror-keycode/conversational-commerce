@@ -3,7 +3,7 @@ import { Loader2 } from 'lucide-react';
 import { cn } from '@/lib/cn';
 
 type Variant = 'primary' | 'secondary' | 'ghost' | 'danger';
-type Size = 'sm' | 'md' | 'lg';
+type Size = 'sm' | 'md';
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: Variant;
@@ -12,18 +12,33 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   children: ReactNode;
 }
 
-/** DESIGN_SYSTEM.md §6 — four variants, three sizes, all seven states. */
+/**
+ * Geometry taken from the design canvas, "Components" artboard:
+ *   md  44px tall, 20px padding, 14px  — the row action, sized for a thumb
+ *   sm  36px tall, 14px padding, 13px  — toolbars and secondary rows
+ * Radius 6 on every button; 1px border on every variant so they share a
+ * silhouette whether or not they are filled.
+ */
 const variants: Record<Variant, string> = {
-  primary: 'bg-accent text-white shadow-xs hover:bg-accent-hover active:bg-accent-active disabled:bg-text-disabled disabled:shadow-none',
-  secondary: 'bg-surface text-text border border-border-strong shadow-xs hover:bg-surface-hover disabled:text-text-disabled disabled:bg-surface-sunken',
-  ghost: 'text-text-secondary hover:bg-surface-hover disabled:text-text-disabled',
-  danger: 'bg-danger text-white hover:bg-danger-hover disabled:bg-text-disabled',
+  primary: cn(
+    'border-accent bg-accent text-on-accent font-semibold',
+    'hover:border-accent-hover hover:bg-accent-hover',
+    'disabled:border-text-disabled disabled:bg-text-disabled',
+  ),
+  secondary: cn(
+    'border-border-strong bg-surface text-text font-medium',
+    'hover:bg-surface-sunken',
+  ),
+  ghost: 'border-transparent bg-transparent text-accent font-medium hover:bg-accent-subtle',
+  danger: cn(
+    'border-danger-border bg-surface text-danger-fg font-medium',
+    'hover:bg-danger-bg',
+  ),
 };
 
 const sizes: Record<Size, string> = {
-  sm: 'h-8 gap-1.5 rounded-md px-2.5 text-small',
-  md: 'h-10 gap-1.5 rounded-lg px-3.5 text-small',
-  lg: 'h-11 gap-2 rounded-lg px-4 text-body',
+  sm: 'h-9 gap-1.5 px-3.5 text-small',
+  md: 'h-11 gap-2 px-5 text-body',
 };
 
 export function Button({
@@ -41,19 +56,18 @@ export function Button({
       disabled={disabled ?? loading}
       aria-busy={loading || undefined}
       className={cn(
-        'relative inline-flex shrink-0 items-center justify-center font-medium whitespace-nowrap',
-        'transition-colors duration-150',
-        'focus-visible:outline-none focus-visible:ring focus-visible:ring-border-focus focus-visible:ring-offset-2',
-        'disabled:cursor-not-allowed',
+        'relative inline-flex shrink-0 items-center justify-center rounded-md border',
+        'whitespace-nowrap transition-colors duration-[120ms]',
+        'disabled:cursor-not-allowed disabled:opacity-70',
         variants[variant],
         sizes[size],
         className,
       )}
       {...rest}
     >
-      {/* The label keeps its width while loading, so the button never resizes
+      {/* The label holds its width while loading, so the button never resizes
           mid-click and shifts the row under the cursor. */}
-      <span className={cn('inline-flex items-center gap-1.5', loading && 'invisible')}>
+      <span className={cn('inline-flex items-center gap-2', loading && 'invisible')}>
         {children}
       </span>
       {loading ? (
@@ -65,18 +79,28 @@ export function Button({
 
 interface IconButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   label: string;
+  /** `bare` is the drawer close; the default carries a border. */
+  variant?: 'bordered' | 'bare';
   children: ReactNode;
 }
 
-export function IconButton({ label, className, children, ...rest }: IconButtonProps) {
+export function IconButton({
+  label,
+  variant = 'bordered',
+  className,
+  children,
+  ...rest
+}: IconButtonProps) {
   return (
     <button
       type="button"
       aria-label={label}
       className={cn(
-        'inline-flex size-8 shrink-0 items-center justify-center rounded-md',
-        'text-text-secondary transition-colors duration-150 hover:bg-surface-hover hover:text-text',
-        'focus-visible:outline-none focus-visible:ring focus-visible:ring-border-focus focus-visible:ring-offset-2',
+        'inline-flex size-9 shrink-0 items-center justify-center rounded-md border',
+        'text-text-secondary transition-colors duration-[120ms]',
+        variant === 'bordered'
+          ? 'border-border-strong bg-surface hover:bg-surface-sunken'
+          : 'border-transparent bg-transparent hover:bg-surface-sunken',
         className,
       )}
       {...rest}

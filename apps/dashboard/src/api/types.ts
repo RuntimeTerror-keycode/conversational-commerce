@@ -1,86 +1,30 @@
 /**
  * Dashboard API contract — apps/dashboard <-> apps/api
  *
- * Handover draft for the backend dev. Full rationale in docs/frontend-contract.md.
+ * MIRRORS THE IMPLEMENTED BACKEND. Every type here matches
+ * `apps/api/src/types/*.ts` field for field. When the backend changes, change
+ * this file to match — do not add fields the API does not actually return.
  *
- * Status of each block is marked below:
- *   EXISTING  — already in packages/contracts/src/index.ts, restated here for
- *               a self-contained handover. Do not redefine, import it.
- *   AGREED    — specified in docs/contracts.md §C2/§C3.
- *   PROPOSED  — needs backend agreement before either side builds against it.
+ * See docs/contracts.md §C2 and its changelog for how this diverged from the
+ * FE proposal in docs/frontend-contract.md. The headlines:
  *
- * Money: every amount is a whole-rupee number (320 === Rs 320), matching the
- * existing agent/cart stubs. If the backend prefers integer paise, say so — it
- * is one formatting function on our side. (Q-X1)
- *
- * Timestamps: ISO 8601 UTC strings.
+ *   - Orders are **fulfillments** — a shop's slice of a customer's master
+ *     order. Each shop only ever sees its own.
+ *   - Auth is a username lookup returning a `shopId`, sent back as an
+ *     `X-Shop-Id` header. No password, no cookie, no session to expire.
+ *   - Ids are **numbers**, not strings.
+ *   - Money is **decimal rupees** (`320.5` = ₹320.50), DECIMAL(10,2) in the DB.
  */
 
-/* ------------------------------------------------------------------ *
- * Primitives
- * ------------------------------------------------------------------ */
-
-/** Whole rupees. 320 === Rs 320. See Q-X1. */
+/** Decimal rupees. 320.5 === ₹320.50. */
 export type Money = number;
 
-/** ISO 8601 UTC, e.g. "2026-09-16T09:28:11Z". */
+/** ISO 8601 timestamp string. */
 export type Timestamp = string;
 
 /* ------------------------------------------------------------------ *
- * Order status — EXISTING (packages/contracts/src/index.ts)
+ * Envelopes
  * ------------------------------------------------------------------ */
-
-export type OrderStatus =
-  | 'draft'
-  | 'placed'
-  | 'accepted'
-  | 'rejected'
-  | 'packed'
-  | 'out_for_delivery'
-  | 'delivered';
-
-/**
- * Statuses the dashboard ever displays.
- *
- * `draft` is a cart still being built over WhatsApp. `placed` exists only in
- * the instant before auto-accept fires. Neither is ever shown, so
- * GET /api/orders must exclude both by default.
- *
- * `rejected` is listed because it is in the shared enum, but nothing in the
- * product can currently produce it — there is no reject anywhere. (Q-O12)
- */
-export type VisibleOrderStatus = Extract<
-  OrderStatus,
-  'accepted' | 'packed' | 'out_for_delivery' | 'delivered' | 'rejected'
->;
-
-/**
- * Transitions the dashboard is allowed to request.
- *
- * The system owns `placed -> accepted` (auto-accept, no human involved).
- * The shopkeeper owns everything after it. A PATCH carrying `accepted` or
- * `rejected` should be rejected with 422.
- */
-export type ShopkeeperTransition = Extract<
-  OrderStatus,
-  'packed' | 'out_for_delivery' | 'delivered'
->;
-
-/* ------------------------------------------------------------------ *
- * Response envelopes — PROPOSED
- * ------------------------------------------------------------------ */
-
-/**
- * List endpoints only. Single-resource endpoints return the bare object.
- *
- * NOTE: this replaces docs/contracts.md §C2's bare `Order[]`. A bare array
- * cannot carry pagination or the cross-page status counts the sidebar badge
- * needs. (Q-X2)
- */
-export interface Paginated<T> {
-  data: T[];
-  page: PageInfo;
-}
 
 export interface PageInfo {
   page: number;
@@ -89,163 +33,163 @@ export interface PageInfo {
   hasMore: boolean;
 }
 
+export interface PaginatedResponse<T> {
+  data: T[];
+  page: PageInfo;
+  serverTime: Timestamp;
+}
+
+export type ErrorCode =
+  | 'bad_request'
+  | 'unauthorized'
+  | 'forbidden'
+  | 'not_found'
+  | 'conflict'
+  | 'validation_failed'
+  | 'rate_limited'
+  | 'internal_error';
+
 export interface ApiError {
   status: 'error';
-  /** Stable and machine-readable. Never string-match `message`. */
-  code:
-    | 'bad_request'
-    | 'unauthorized'
-    | 'forbidden'
-    | 'not_found'
-    | 'conflict'
-    | 'read_only_inventory'
-    | 'validation_failed'
-    | 'rate_limited'
-    | 'internal_error';
-  /** Human-readable. May change freely. */
+  code: ErrorCode;
   message: string;
   details?: Record<string, unknown>;
 }
 
 /* ------------------------------------------------------------------ *
- * Session — PROPOSED (nothing in the repo defines user auth today)
+ * Session — POST /api/identify
  * ------------------------------------------------------------------ */
 
-export type InventoryMode = 'managed' | 'external';
+export interface IdentifyRequest {
+  username: string;
+}
 
-export interface User {
-  id: string;
+export interface SessionUser {
+  id: number;
+  username: string;
   name: string;
-  /** PROPOSED — not in any doc. Brief §4 item 7 asks for editable personal info. */
-  email: string | null;
-  phone: string | null;
-  role: 'owner' | 'staff';
-  retailerId: string;
+  role: string;
 }
 
-/** PROPOSED. PATCH /api/auth/me -> Session (only user fields are writable here). */
-export type ProfilePatch = Partial<Pick<User, 'name' | 'email' | 'phone'>>;
+/**
+ * Derived server-side so the dashboard and the agent can never disagree.
+ *
+ *   offline      — the shopkeeper switched the shop off
+ *   closed       — outside opening hours right now
+ *   open         — taking orders
+ *   always_open  — active, but no hours configured
+ */
+export type ShopOpenState = 'open' | 'closed' | 'offline' | 'always_open';
 
-/** PROPOSED. POST /api/auth/change-password -> 204. */
-export interface ChangePasswordRequest {
-  currentPassword: string;
-  newPassword: string;
-}
-
-export interface Retailer {
-  id: string;
+export interface SessionShop {
+  id: number;
   name: string;
-  area: string;
-  whatsappNumber: string | null;
-  currency: 'INR';
-  timezone: string;
-
-  /**
-   * Drives the entire inventory screen.
-   *
-   *   managed  — we are their inventory system. They add/edit products and
-   *              stock counts here, and packages/domain decrements
-   *              `stockQuantity` after each order.
-   *   external — they run their own POS. We hold a synced copy, decrement
-   *              nothing, and expose it read-only.
-   *
-   * The frontend only READS this to decide what is editable. It never sends a
-   * "decrement or not" flag — that decision lives in packages/domain.
-   */
-  inventoryMode: InventoryMode;
-
-  /** Shop open/closed. Named to avoid confusion with per-order accept. (Q-S2) */
-  shopOpen: boolean;
-  autoAcceptSeconds: number;
-  lowStockThresholdDefault: number;
-
-  /** external mode only; null in managed mode. */
-  sync: SyncState | null;
+  isActive: boolean;
+  /** 'managed' | 'external' in practice; the API types it as a plain string. */
+  inventoryMode: string;
+  /** "HH:MM", or null when the shop has not set hours. */
+  openingTime: string | null;
+  closingTime: string | null;
+  openState: ShopOpenState;
 }
 
-export interface SyncState {
-  provider: string;
-  lastSyncedAt: Timestamp | null;
-  status: 'ok' | 'stale' | 'failed' | 'running';
-  nextSyncAt: Timestamp | null;
-  error?: string;
+/** GET /api/shops/me */
+export interface ShopSettings {
+  id: number;
+  name: string;
+  ownerName: string | null;
+  phone: string;
+  openingTime: string | null;
+  closingTime: string | null;
+  isActive: boolean;
+  inventoryMode: string;
+  deliveryRadiusKm: number | null;
+  openState: ShopOpenState;
+}
+
+/** PATCH /api/shops/me */
+export interface ShopSettingsUpdate {
+  name?: string;
+  ownerName?: string | null;
+  isActive?: boolean;
+  openingTime?: string | null;
+  closingTime?: string | null;
 }
 
 export interface Session {
-  user: User;
-  retailer: Retailer;
-}
-
-export interface LoginRequest {
-  identifier: string;
-  password: string;
+  user: SessionUser;
+  shop: SessionShop;
 }
 
 /* ------------------------------------------------------------------ *
- * Orders — PROPOSED (no Order type exists anywhere in the repo yet)
+ * Fulfillments — what the shopkeeper calls "orders"
  * ------------------------------------------------------------------ */
 
-export interface OrderCustomer {
-  /** wa_id. Opaque key, and currently also the phone number. (Q-C1) */
-  ref: string;
+export type FulfillmentStatus =
+  | 'accepted'
+  | 'packed'
+  | 'out_for_delivery'
+  | 'delivered'
+  | 'rejected';
+
+/**
+ * Transitions the dashboard may request (docs/contracts.md §C2).
+ *
+ * `accepted` is never sent — the system auto-accepts and a fulfillment is born
+ * in that state. `rejected` is in the enum defensively but nothing produces
+ * it. The backend rejects anything outside this set with 422.
+ */
+export type DashboardTransition = Extract<
+  FulfillmentStatus,
+  'packed' | 'out_for_delivery' | 'delivered'
+>;
+
+export interface FulfillmentCustomer {
   displayName: string | null;
-  /** Full number for delivery. Detail responses only. (Q-C1) */
-  phone?: string;
+  phone: string;
 }
 
-export interface OrderLine {
-  lineId: string;
-  productId: string;
+export interface FulfillmentSummary {
+  id: number;
+  orderCode: string;
+  status: FulfillmentStatus;
+  customer: FulfillmentCustomer;
+  itemCount: number;
+  subtotal: Money;
+  deliveryType: string;
+  acceptedAt: Timestamp | null;
+  updatedAt: Timestamp | null;
+}
+
+export type FulfillmentCounts = Record<FulfillmentStatus, number>;
+
+/** Money totals across every matching row, not just the returned page. */
+export interface FulfillmentTotals {
+  deliveredRevenue: Money;
+  deliveredRevenueToday: Money;
+}
+
+export interface FulfillmentListResponse extends PaginatedResponse<FulfillmentSummary> {
+  counts: FulfillmentCounts;
+  totals: FulfillmentTotals;
+}
+
+export interface FulfillmentLineItem {
+  lineId: number;
+  shopProductId: number;
+  /** The shop's own name for the product. */
   productName: string;
-
-  /**
-   * What the customer actually typed — "2 kg ari".
-   *
-   * REQUIRED by docs/contracts.md §C3 rule 3 and displayed on every line. It
-   * is the single best on-screen proof the AI did something.
-   */
-  sourceText?: string;
-
+  /** The shared catalogue name. */
+  catalogName: string;
   quantity: number;
   unit: string;
   unitPrice: Money;
   lineTotal: Money;
-  availability: 'in_stock' | 'out_of_stock';
-  /** Set when this line replaced another product. */
-  substitutedFor: { productId: string; productName: string } | null;
+  /** What the customer actually typed — "2 kg ari". docs/contracts.md §C3 rule 3. */
+  sourceText: string | null;
 }
 
-export interface OrderEvent {
-  at: Timestamp;
-  type:
-    | 'placed'
-    | 'accepted'
-    | 'rejected'
-    | 'packed'
-    | 'out_for_delivery'
-    | 'delivered'
-    | 'line_changed'
-    | 'substitution';
-  /** `system` covers auto-accept — it must be legible as not-a-human. */
-  actor: 'customer' | 'retailer' | 'system' | 'agent';
-  note?: string;
-}
-
-export interface OrderDelivery {
-  mode: 'delivery' | 'pickup';
-  address: string | null;
-  note: string | null;
-  etaMinutes: number | null;
-}
-
-/** Payment is mentioned in no document. Assuming COD until told otherwise. (Q-O5) */
-export interface OrderPayment {
-  method: 'cod';
-  status: 'pending' | 'paid';
-}
-
-export interface OrderTimeline {
-  placedAt: Timestamp;
+export interface FulfillmentTimeline {
   acceptedAt: Timestamp | null;
   packedAt: Timestamp | null;
   outForDeliveryAt: Timestamp | null;
@@ -253,197 +197,166 @@ export interface OrderTimeline {
   rejectedAt: Timestamp | null;
 }
 
-/** Row shape for GET /api/orders. Deliberately smaller than Order. */
-export interface OrderSummary {
-  id: string;
-  /** Short and human — "#1042". Something the shop can say out loud. */
+export interface FulfillmentEvent {
+  id: number;
+  /** Free-form from the API, e.g. "status_packed", "placed". */
+  eventType: string;
+  /** 'customer' | 'retailer' | 'system' | 'agent' in practice. */
+  actor: string;
+  note: string | null;
+  createdAt: Timestamp;
+}
+
+export interface FulfillmentDetail {
+  id: number;
   orderCode: string;
-  status: VisibleOrderStatus;
-  customer: OrderCustomer;
-  itemCount: number;
-  /** First line's sourceText, so §C3 rule 3 holds without opening the order. */
-  firstLineSourceText: string | null;
-  total: Money;
-  currency: 'INR';
-  placedAt: Timestamp;
-  acceptedAt: Timestamp | null;
-  updatedAt: Timestamp;
-}
-
-export interface Order extends Omit<OrderSummary, 'itemCount' | 'firstLineSourceText'> {
-  items: OrderLine[];
+  status: FulfillmentStatus;
+  customer: FulfillmentCustomer;
+  items: FulfillmentLineItem[];
   subtotal: Money;
-  deliveryFee: Money;
-  delivery: OrderDelivery;
-  payment: OrderPayment;
-  timeline: OrderTimeline;
+  delivery: {
+    type: string;
+    address: string | null;
+    city: string | null;
+    note: string | null;
+  };
+  payment: {
+    method: string;
+    status: string;
+  };
+  timeline: FulfillmentTimeline;
   rejectionReason: string | null;
-  events: OrderEvent[];
-  /** Threaded from the edge. Surfaced in the UI for debugging. */
+  events: FulfillmentEvent[];
   traceId: string | null;
+  updatedAt: Timestamp | null;
 }
 
-/** Counts across ALL matching orders, ignoring pagination — the badge must not lie. */
-export type OrderStatusCounts = Record<VisibleOrderStatus, number>;
-
-export interface OrderListResponse extends Paginated<OrderSummary> {
-  counts: OrderStatusCounts;
-  /** Echo back as `since` on the next poll. */
-  serverTime: Timestamp;
-}
-
-export interface OrderListQuery {
-  status?: VisibleOrderStatus[] | 'new' | 'in_progress';
+/**
+ * GET /api/fulfillments
+ *
+ * NOTE: `status` is a SINGLE value. The API validates it against the enum and
+ * returns 422 for a comma-separated list, so multi-status tabs are not
+ * expressible in one request. There is also no `q` search parameter.
+ */
+export interface FulfillmentListQuery {
+  status?: FulfillmentStatus;
   since?: Timestamp;
-  q?: string;
-  dateFrom?: Timestamp;
-  dateTo?: Timestamp;
   page?: number;
   limit?: number;
-  sort?: 'placedAt:desc' | 'placedAt:asc' | 'total:desc';
 }
 
-/** PATCH /api/orders/:id — fulfilment transitions only. */
-export interface OrderStatusPatch {
-  status: ShopkeeperTransition;
+/** PATCH /api/fulfillments/:id */
+export interface FulfillmentStatusPatch {
+  status: DashboardTransition;
 }
 
-/** PATCH /api/orders/:id/items/:lineId — exactly one field. Returns the full Order. */
-export type OrderLinePatch =
+/** PATCH /api/fulfillments/:id/items/:lineId — `accepted` fulfillments only. */
+export type FulfillmentItemPatch =
   | { quantity: number }
-  | { substituteProductId: string }
+  | { substituteProductId: number }
   | { remove: true };
 
 /* ------------------------------------------------------------------ *
- * Inventory — partly AGREED (§C2), stockQuantity PROPOSED
+ * Inventory
  * ------------------------------------------------------------------ */
 
 export interface Product {
-  id: string;
-  sku: string | null;
+  id: number;
+  /** Catalogue name. */
   name: string;
+  /** The shop's own/colloquial name — the closest thing to a search alias. */
+  localName: string | null;
   brand: string | null;
   category: string | null;
-  unit: string;
-  price: Money;
-  currency: 'INR';
-
-  /** Present in BOTH modes. This is the signal the agent grounds on. */
+  unit: string | null;
+  sku: string | null;
+  regularPrice: Money;
+  sellingPrice: Money;
   inStock: boolean;
-
-  /**
-   * Managed mode only; null in external mode.
-   *
-   * docs/contracts.md §C2 specifies a boolean `inStock` alone, which is enough
-   * for external shops but cannot serve managed ones — we decrement this after
-   * every order. Written through the ordinary PATCH below, not a separate
-   * stock endpoint. (Q-I1)
-   */
-  stockQuantity: number | null;
-  lowStockThreshold: number | null;
-  /** Derived server-side so the frontend never computes it. */
+  stockQuantity: number;
+  lowStockThreshold: number;
   isLow: boolean;
-
-  /** Colloquial search terms — "ari", "chaya podi". (Q-I4) */
-  aliases: string[];
-  updatedAt: Timestamp;
-  /** external mode only. */
-  syncedAt: Timestamp | null;
+  updatedAt: Timestamp | null;
 }
 
-export interface ProductListResponse extends Paginated<Product> {
-  counts: { total: number; inStock: number; low: number; out: number };
-  /** Saves a second call for the filter dropdown. */
+export interface InventoryCounts {
+  total: number;
+  inStock: number;
+  low: number;
+  out: number;
+}
+
+export interface InventoryListResponse extends PaginatedResponse<Product> {
+  counts: InventoryCounts;
+  /** Categories this shop stocks — populates the filter dropdown. */
   categories: string[];
 }
 
-export interface ProductListQuery {
+/** A shared-catalogue item the shop could stock. */
+export interface CatalogItem {
+  catalogId: number;
+  name: string;
+  brand: string | null;
+  category: string | null;
+  unit: string | null;
+  sku: string | null;
+  alreadyStocked: boolean;
+}
+
+/** POST /api/inventory */
+export interface InventoryCreateInput {
+  catalogId: number;
+  sellingPrice: Money;
+  regularPrice?: Money;
+  stockQuantity?: number;
+  lowStockThreshold?: number;
+  localName?: string | null;
+}
+
+export type StockStateFilter = 'in_stock' | 'low' | 'out';
+
+export interface InventoryListQuery {
   q?: string;
   category?: string;
-  stockState?: 'all' | 'in_stock' | 'low' | 'out';
+  stockState?: StockStateFilter;
   page?: number;
   limit?: number;
-  sort?: 'name:asc' | 'price:asc' | 'stockQuantity:asc' | 'updatedAt:desc';
 }
 
-/** Any subset. 409 `read_only_inventory` in external mode. */
-export type ProductPatch = Partial<
-  Pick<
-    Product,
-    | 'name'
-    | 'sku'
-    | 'brand'
-    | 'category'
-    | 'unit'
-    | 'price'
-    | 'inStock'
-    | 'stockQuantity'
-    | 'lowStockThreshold'
-    | 'aliases'
-  >
->;
-
-/** POST /api/inventory — managed mode only. */
-export interface ProductCreate {
-  name: string;
-  unit: string;
-  price: Money;
-  inStock: boolean;
-  stockQuantity: number;
-  sku?: string;
-  brand?: string;
-  category?: string;
+/** PATCH /api/inventory/:id */
+export interface InventoryUpdateInput {
+  sellingPrice?: Money;
+  inStock?: boolean;
+  stockQuantity?: number;
   lowStockThreshold?: number;
-  aliases?: string[];
 }
 
 /* ------------------------------------------------------------------ *
- * Dashboard KPIs — PROPOSED
- *
- * Everything except `revenue` can be derived from the `counts` blocks on the
- * orders and inventory lists. If this endpoint is awkward to build, say so and
- * we will drop it. (Q-D2)
- * ------------------------------------------------------------------ */
-
-export interface StatsSummary {
-  range: 'today' | '7d' | '30d';
-  /** status === 'accepted' — arrived, untouched. This is the sidebar badge. */
-  newOrders: number;
-  /** packed + out_for_delivery. */
-  activeOrders: number;
-  completedToday: number;
-  revenue: Money;
-  currency: 'INR';
-  lowStockCount: number;
-  outOfStockCount: number;
-}
-
-/* ------------------------------------------------------------------ *
- * Endpoint map
+ * Endpoint map (as implemented)
  * ------------------------------------------------------------------ *
  *
- *  POST   /api/auth/login              LoginRequest      -> Session
- *  POST   /api/auth/logout             -                 -> 204
- *  GET    /api/auth/me                 -                 -> Session
- *  PATCH  /api/auth/me                 ProfilePatch      -> Session      (PROPOSED)
- *  POST   /api/auth/change-password    ChangePasswordRequest -> 204      (PROPOSED)
+ *  POST   /api/identify                       IdentifyRequest -> Session
  *
- *  GET    /api/orders                  OrderListQuery    -> OrderListResponse
- *  GET    /api/orders/:id              -                 -> Order
- *  PATCH  /api/orders/:id              OrderStatusPatch  -> Order
- *  PATCH  /api/orders/:id/items/:lineId OrderLinePatch   -> Order
+ *  All routes below require the `X-Shop-Id` header.
  *
- *  GET    /api/inventory               ProductListQuery  -> ProductListResponse
- *  GET    /api/inventory/:id           -                 -> Product
- *  POST   /api/inventory               ProductCreate     -> Product    (managed)
- *  PATCH  /api/inventory/:id           ProductPatch      -> Product
- *  DELETE /api/inventory/:id           -                 -> 204        (managed)
- *  POST   /api/inventory/sync          -                 -> SyncState  (external)
- *  GET    /api/inventory/sync          -                 -> SyncState  (external)
+ *  GET    /api/fulfillments                   FulfillmentListQuery -> FulfillmentListResponse
+ *  GET    /api/fulfillments/:id               -> FulfillmentDetail
+ *  PATCH  /api/fulfillments/:id               FulfillmentStatusPatch -> FulfillmentDetail
+ *  PATCH  /api/fulfillments/:id/items/:lineId FulfillmentItemPatch -> FulfillmentDetail
  *
- *  GET    /api/stats/summary           ?range=           -> StatsSummary
- *  PATCH  /api/retailer                Partial<Retailer> -> Retailer
+ *  GET    /api/inventory                      InventoryListQuery -> InventoryListResponse
+ *  GET    /api/inventory/catalog              ?q&limit -> { data: CatalogItem[] }
+ *  POST   /api/inventory                      InventoryCreateInput -> Product
+ *  PATCH  /api/inventory/:id                  InventoryUpdateInput -> Product
+ *  DELETE /api/inventory/:id                  -> 204 — implemented server-side,
+ *                                                deliberately not exposed in the UI
  *
- * retailerId is NEVER sent by the frontend. It is derived from the session
- * server-side — scoping enforced inside, not by the caller (CLAUDE.md rule 4).
+ *  GET    /api/shops/me                       -> ShopSettings
+ *  PATCH  /api/shops/me                       ShopSettingsUpdate -> ShopSettings
+ *
+ *  GET    /api/health
+ *
+ * Still not implemented:
+ *  - no search on fulfillments (no `q` parameter)
+ *  - `sourceText` is hardcoded null server-side and has no column
  */

@@ -1,47 +1,45 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { ApiRequestError } from '@/api/client';
-import { fetchSession, login, logout } from '@/api/auth';
+import { identify, readStoredSession, signOut } from '@/api/session';
 import { queryKeys } from '@/api/keys';
-import type { LoginRequest } from '@/api/types';
+import type { Session } from '@/api/types';
 
 /**
- * One query bootstraps the whole app.
+ * The session lives in localStorage, not on the server.
  *
- * A 401 here is not an error state — it just means "not logged in", so it must
- * not retry and must not surface as a failure screen.
+ * `/api/identify` is a lookup, not a login — it mints nothing and expires
+ * nothing (docs/contracts.md §C2). So the "session query" just reads what the
+ * browser already holds; there is no `/auth/me` to call and nothing to refetch.
  */
 export function useSession() {
-  return useQuery({
+  return useQuery<Session | null>({
     queryKey: queryKeys.session,
-    queryFn: fetchSession,
-    retry: (_count, error) =>
-      !(error instanceof ApiRequestError && error.isUnauthorized),
-    staleTime: 5 * 60_000,
+    queryFn: () => readStoredSession(),
+    staleTime: Infinity,
+    retry: false,
   });
 }
 
-export function useLogin() {
+export function useIdentify() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (credentials: LoginRequest) => login(credentials),
+    mutationFn: (username: string) => identify(username),
     onSuccess: (session) => {
       queryClient.setQueryData(queryKeys.session, session);
     },
   });
 }
 
-export function useLogout() {
+export function useSignOut() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
 
   return useMutation({
-    mutationFn: logout,
+    mutationFn: async () => signOut(),
     onSuccess: () => {
-      // Navigate first, then clear. The other way round leaves the guarded
-      // routes mounted with an empty cache, refetching against a session that
-      // is already gone.
+      // Navigate before clearing, so guarded routes are already unmounted and
+      // do not fire a round of requests with no shop id attached.
       navigate('/login', { replace: true });
       queryClient.clear();
     },

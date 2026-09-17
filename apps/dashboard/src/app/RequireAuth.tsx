@@ -1,6 +1,5 @@
 import { Navigate, Outlet } from 'react-router-dom';
 import { Store } from 'lucide-react';
-import { ApiRequestError } from '@/api/client';
 import { useSession } from '@/features/auth/useSession';
 
 export function RequireAuth() {
@@ -19,10 +18,9 @@ export function RequireAuth() {
     );
   }
 
-  const unauthorized =
-    session.error instanceof ApiRequestError && session.error.isUnauthorized;
-
-  if (unauthorized || !session.data) return <Navigate to="/login" replace />;
+  // The session is whatever localStorage holds — there is no server session to
+  // validate, so "no stored shop" is the only signed-out condition.
+  if (!session.data) return <Navigate to="/login" replace />;
 
   return <Outlet />;
 }

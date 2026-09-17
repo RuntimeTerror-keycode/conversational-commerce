@@ -1,13 +1,7 @@
 import type { ApiError } from './types';
+import { currentShopId } from './shop-context';
 
-/**
- * No fallback, on purpose. An unset base URL means the app is
- * misconfigured, not that it should quietly talk to localhost or
- * serve fake data — `isApiConfigured` gates the whole router on this.
- */
 const baseUrl = import.meta.env.VITE_API_BASE_URL;
-
-export const isApiConfigured = Boolean(baseUrl);
 
 export class ApiRequestError extends Error {
   readonly status: number;
@@ -22,24 +16,47 @@ export class ApiRequestError extends Error {
     this.details = body.details;
   }
 
-  /** Session gone. The router guard redirects on this. */
+  /**
+   * The username was not recognised at identify time.
+   *
+   * There is no session to expire — auth is a stateless header — so a 401 only
+   * ever comes from `/api/identify`.
+   */
   get isUnauthorized(): boolean {
     return this.status === 401;
   }
 
   /**
-   * Someone else already advanced this order, or two tabs raced.
-   * Never a hard failure — refetch and reconcile.
+   * The stored shop id is no longer usable: unknown shop (400) or deactivated
+   * (403). Both mean the same thing to the UI — sign out and identify again.
    */
+  get isShopRejected(): boolean {
+    return (
+      (this.status === 400 && /shop/i.test(this.message)) || this.status === 403
+    );
+  }
+
+  /** Someone else already advanced this fulfillment, or two tabs raced. */
   get isConflict(): boolean {
     return this.status === 409;
   }
 }
 
+export class MissingApiUrlError extends Error {
+  constructor() {
+    super('VITE_API_BASE_URL is not set');
+    this.name = 'MissingApiUrlError';
+  }
+}
+
+export const isApiConfigured = Boolean(baseUrl);
+
 export interface RequestOptions {
   method?: 'GET' | 'POST' | 'PATCH' | 'DELETE';
   body?: unknown;
   query?: Record<string, string | number | boolean | undefined | null>;
+  /** Identify is the one route that must not send X-Shop-Id. */
+  skipShopHeader?: boolean;
 }
 
 function buildPath(path: string, query?: RequestOptions['query']): string {
@@ -55,25 +72,30 @@ function buildPath(path: string, query?: RequestOptions['query']): string {
   return queryString ? `${path}?${queryString}` : path;
 }
 
-/**
- * Every call goes through here.
- *
- * `credentials: 'include'` assumes an httpOnly session cookie (Q-A1). If the
- * backend lands on bearer tokens instead, this function is the only thing that
- * changes.
- */
 export async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
-  if (!baseUrl) {
-    throw new Error('VITE_API_BASE_URL is not set — see ConfigErrorScreen');
+  if (!baseUrl) throw new MissingApiUrlError();
+
+  const { method = 'GET', body, query, skipShopHeader } = options;
+
+  const headers: Record<string, string> = {};
+  if (body) headers['Content-Type'] = 'application/json';
+
+  if (!skipShopHeader) {
+    const shopId = currentShopId();
+    // Every scoped route 400s without this. Failing here with a clear code
+    // beats letting the server reject it and reading like a server fault.
+    if (shopId === null) {
+      throw new ApiRequestError(401, {
+        code: 'unauthorized',
+        message: 'Not signed in to a shop',
+      });
+    }
+    headers['X-Shop-Id'] = String(shopId);
   }
 
-  const { method = 'GET', body, query } = options;
-  const fullPath = buildPath(path, query);
-
-  const response = await fetch(`${baseUrl}${fullPath}`, {
+  const response = await fetch(`${baseUrl}${buildPath(path, query)}`, {
     method,
-    credentials: 'include',
-    headers: body ? { 'Content-Type': 'application/json' } : undefined,
+    headers,
     body: body ? JSON.stringify(body) : undefined,
   });
 

@@ -1,113 +1,107 @@
 import { useState } from 'react';
-import { Boxes, Plus, Search } from 'lucide-react';
+import { Ban, Boxes, Info, Plus, Search, TriangleAlert } from 'lucide-react';
 import { ApiRequestError } from '@/api/client';
-import type { Product, ProductListQuery, Retailer } from '@/api/types';
+import type { InventoryListQuery, Product, SessionShop } from '@/api/types';
 import { PageHeader } from '@/app/PageHeader';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { Input } from '@/components/ui/Input';
-import { Panel } from '@/components/ui/Panel';
-import { Segmented, type SegmentItem } from '@/components/ui/Segmented';
-import { Select } from '@/components/ui/Select';
-import { SkeletonTable } from '@/components/ui/Skeleton';
+import { Skeleton } from '@/components/ui/Skeleton';
 import { Toggle } from '@/components/ui/Toggle';
 import { useToast } from '@/components/ui/Toast';
 import { useSession } from '@/features/auth/useSession';
-import { formatMoney, timeAgo } from '@/lib/format';
 import { cn } from '@/lib/cn';
-import { ProductDrawer } from './ProductDrawer';
-import { StockCell } from './StockCell';
+import { AddProductDrawer } from './AddProductDrawer';
+import { CategoryChips } from './CategoryChips';
+import { PriceCell } from './PriceCell';
+import { StockStepper } from './StockStepper';
 import { SyncBanner } from './SyncBanner';
 import { useInventory, useUpdateProduct } from './useInventory';
 
-type StockState = NonNullable<ProductListQuery['stockState']>;
+/** 'all' is UI-only — the API filter is simply omitted for it. */
+type StockState = NonNullable<InventoryListQuery['stockState']> | 'all';
 
-function AvailabilityBadge({ product, editable }: { product: Product; editable: boolean }) {
-  if (editable && product.isLow) return <Badge tone="warning">Low</Badge>;
-  if (!product.inStock) return <Badge tone="danger">Out of stock</Badge>;
-  return <Badge tone="success">In stock</Badge>;
-}
+const grid =
+  'grid grid-cols-[minmax(0,1fr)_176px_132px_196px_128px] items-center gap-4 px-6';
 
-function InventoryTable({ retailer }: { retailer: Retailer }) {
+function InventoryTable({ shop }: { shop: SessionShop }) {
   const toast = useToast();
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('');
+  // Kept so the dashboard can deep-link to a filtered view; there is no
+  // on-screen control for it, per the design.
   const [stockState, setStockState] = useState<StockState>('all');
-  const [drawerProduct, setDrawerProduct] = useState<Product | null | 'new'>(null);
 
-  const editable = retailer.inventoryMode === 'managed';
+  const editable = shop.inventoryMode === 'managed';
   const { data, isPending, error, refetch, isPlaceholderData } = useInventory({
     q: search || undefined,
     category: category || undefined,
-    stockState,
+    stockState: stockState === 'all' ? undefined : stockState,
   });
   const update = useUpdateProduct();
 
   const onError = (mutationError: unknown) => {
     toast(
-      mutationError instanceof ApiRequestError &&
-        mutationError.code === 'read_only_inventory'
+      mutationError instanceof ApiRequestError && mutationError.status === 403
         ? 'This inventory syncs from your billing system and cannot be edited here.'
         : 'Could not save that change.',
       'error',
     );
   };
 
-  const categoryOptions = [
-    { value: '', label: 'All categories' },
-    ...(data?.categories ?? []).map((name) => ({ value: name, label: name })),
-  ];
-
-  const stockFilters: SegmentItem<StockState>[] = [
-    { value: 'all', label: 'All', count: data?.counts.total },
-    { value: 'low', label: 'Low', count: data?.counts.low, tone: 'attention' },
-    { value: 'out', label: 'Out', count: data?.counts.out },
-  ];
+  const patch = (product: Product, body: Parameters<typeof update.mutate>[0]['patch']) =>
+    update.mutate({ id: product.id, patch: body }, { onError });
 
   const products = data?.data ?? [];
   const hasFilters = Boolean(search || category || stockState !== 'all');
 
-  const clearFilters = () => {
-    setSearch('');
-    setCategory('');
-    setStockState('all');
-  };
-
   return (
     <>
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <Segmented items={stockFilters} value={stockState} onChange={setStockState} />
-
-        <div className="flex flex-1 flex-wrap items-center justify-end gap-2">
-          <Select
-            aria-label="Category"
-            options={categoryOptions}
-            value={category}
-            onValueChange={setCategory}
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="w-full sm:w-[340px]">
+          <Input
+            placeholder="Search your products"
+            aria-label="Search inventory"
+            leading={<Search className="size-3.5" aria-hidden />}
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
           />
-          <div className="w-full sm:w-60">
-            <Input
-              placeholder="Search products"
-              aria-label="Search inventory"
-              leading={<Search className="size-3.5" aria-hidden />}
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-            />
-          </div>
-          {editable ? (
-            <Button variant="primary" onClick={() => setDrawerProduct('new')}>
-              <Plus className="size-3.5" aria-hidden />
-              Add product
-            </Button>
-          ) : null}
         </div>
+
+        <CategoryChips
+          categories={data?.categories ?? []}
+          value={category}
+          total={data?.counts.total}
+          onChange={setCategory}
+        />
       </div>
 
-      <Panel>
+      <div className="overflow-hidden rounded-lg border border-border bg-surface">
+        <div
+          className={cn(
+            grid,
+            'border-b border-border bg-surface-sunken py-2.5 text-caption text-text-muted uppercase',
+          )}
+        >
+          <div>Product · your name</div>
+          <div>Category</div>
+          <div>Your price</div>
+          <div>Stock</div>
+          <div className="text-right">Available</div>
+        </div>
+
         {isPending && !data ? (
-          <SkeletonTable editable={editable} />
+          <div className="divide-y divide-neutral-bg">
+            {Array.from({ length: 6 }, (_, index) => (
+              <div key={index} className={cn(grid, 'py-3.5')}>
+                {Array.from({ length: 5 }, (_, cell) => (
+                  <Skeleton key={cell} className="h-8" />
+                ))}
+              </div>
+            ))}
+          </div>
         ) : error ? (
           <ErrorState title="Could not load inventory" onRetry={() => void refetch()} />
         ) : products.length === 0 ? (
@@ -117,192 +111,142 @@ function InventoryTable({ retailer }: { retailer: Retailer }) {
             description={
               hasFilters
                 ? 'Try a different search or clear the filters.'
-                : 'Add your first product to start tracking inventory.'
+                : 'Products come from the shared catalogue — nothing is stocked here yet.'
             }
             action={
               hasFilters ? (
-                <Button variant="secondary" onClick={clearFilters}>Clear filters</Button>
-              ) : editable ? (
-                <Button variant="primary" onClick={() => setDrawerProduct('new')}>Add product</Button>
+                <Button
+                  onClick={() => {
+                    setSearch('');
+                    setCategory('');
+                    setStockState('all');
+                  }}
+                >
+                  Clear filters
+                </Button>
               ) : undefined
             }
           />
         ) : (
-          <>
-            {/* Table at md and up. */}
-            <div className={cn('hidden overflow-x-auto md:block', isPlaceholderData && 'opacity-50')}>
-              <table className="w-full border-collapse transition-opacity duration-200">
-                <caption className="sr-only">Product inventory</caption>
-                <thead>
-                  <tr className="border-b border-border bg-canvas text-left">
-                    <th scope="col" className="px-4 py-2.5 text-caption font-semibold text-text-muted uppercase tracking-wide">Product</th>
-                    <th scope="col" className="hidden px-4 py-2.5 text-caption font-semibold text-text-muted uppercase tracking-wide lg:table-cell">Category</th>
-                    <th scope="col" className="px-4 py-2.5 text-right text-caption font-semibold text-text-muted uppercase tracking-wide">Price</th>
-                    {editable ? (
-                      <th scope="col" className="px-4 py-2.5 text-right text-caption font-semibold text-text-muted uppercase tracking-wide">Stock</th>
-                    ) : null}
-                    <th scope="col" className="px-4 py-2.5 text-caption font-semibold text-text-muted uppercase tracking-wide">Availability</th>
-                    <th scope="col" className="hidden px-4 py-2.5 text-right text-caption font-semibold text-text-muted uppercase tracking-wide xl:table-cell">Updated</th>
-                  </tr>
-                </thead>
+          <div className={isPlaceholderData ? 'opacity-50 transition-opacity' : undefined}>
+            {products.map((product) => (
+              <div
+                key={product.id}
+                className={cn(
+                  grid,
+                  'border-b border-neutral-bg py-3 last:border-b-0',
+                  'transition-colors duration-[120ms] hover:bg-surface-hover',
+                  !product.inStock && 'text-text-muted opacity-70',
+                )}
+              >
+                <div className="flex min-w-0 flex-col gap-0.5">
+                  {/*
+                    The shop's own word for it leads — "ari", "ചായ പൊടി" — because
+                    that is what makes a Malayalam message match. The catalogue
+                    name sits under it for when the two differ.
+                  */}
+                  <span className="truncate text-[14.5px] font-semibold">
+                    {product.localName ?? product.name}
+                  </span>
+                  {product.localName ? (
+                    <span className="truncate text-xs font-normal text-text-muted">
+                      {product.name}
+                    </span>
+                  ) : null}
+                </div>
 
-                <tbody className="divide-y divide-border">
-                  {products.map((product) => (
-                    <tr
-                      key={product.id}
-                      className={cn(
-                        'group transition-colors duration-150 hover:bg-surface-hover',
-                        !product.inStock && 'bg-danger-bg/30',
-                      )}
-                    >
-                      <td className="px-4 py-2.5">
-                        <button
-                          type="button"
-                          onClick={() => editable && setDrawerProduct(product)}
-                          className={cn('text-left', editable && 'hover:underline')}
-                        >
-                          <p className="text-body font-medium">{product.name}</p>
-                        </button>
-                        <p className="text-caption text-text-disabled">
-                          <span className="font-numeric">{product.sku}</span>
-                          {product.unit ? ` · ${product.unit}` : ''}
-                        </p>
-                        {/*
-                          Aliases are the highest-leverage field in the product
-                          for Kerala — "ari" is how a customer asks for rice, and
-                          the alias table is what turns that into a match.
-                        */}
-                        {product.aliases.length > 0 ? (
-                          <p className="mt-1 flex flex-wrap gap-1">
-                            {product.aliases.slice(0, 3).map((alias) => (
-                              <span
-                                key={alias}
-                                className="rounded bg-surface-sunken px-1.5 py-px text-caption tracking-normal text-text-muted"
-                              >
-                                {alias}
-                              </span>
-                            ))}
-                          </p>
-                        ) : null}
-                      </td>
+                <div className="truncate text-small text-text-secondary">
+                  {product.category ?? '—'}
+                </div>
 
-                      <td className="hidden px-4 py-2.5 text-small text-text-secondary lg:table-cell">
-                        {product.category ?? '—'}
-                      </td>
+                <PriceCell
+                  value={product.sellingPrice}
+                  disabled={!editable}
+                  onCommit={(sellingPrice) => patch(product, { sellingPrice })}
+                />
 
-                      <td className="font-numeric px-4 py-2.5 text-right text-body font-medium">
-                        {formatMoney(product.price)}
-                      </td>
+                <div className="flex items-center gap-2.5">
+                  <StockStepper
+                    value={product.stockQuantity}
+                    isLow={product.isLow}
+                    disabled={!editable}
+                    onCommit={(stockQuantity) => patch(product, { stockQuantity })}
+                  />
+                  {product.isLow ? (
+                    <Badge tone="warning" icon={TriangleAlert}>
+                      Low
+                    </Badge>
+                  ) : !product.inStock ? (
+                    <Badge tone="neutral" icon={Ban}>
+                      Out
+                    </Badge>
+                  ) : null}
+                </div>
 
-                      {editable ? (
-                        <td className="px-4 py-2.5 text-right">
-                          <StockCell
-                            value={product.stockQuantity ?? 0}
-                            isLow={product.isLow}
-                            editable={editable}
-                            onCommit={(stockQuantity) =>
-                              update.mutate(
-                                { productId: product.id, patch: { stockQuantity } },
-                                { onError },
-                              )
-                            }
-                          />
-                        </td>
-                      ) : null}
-
-                      <td className="px-4 py-2.5">
-                        {editable ? (
-                          <div className="flex items-center gap-2.5">
-                            <Toggle
-                              checked={product.inStock}
-                              offTone="danger"
-                              label={`${product.name} in stock`}
-                              onChange={(inStock) =>
-                                update.mutate(
-                                  { productId: product.id, patch: { inStock } },
-                                  { onError },
-                                )
-                              }
-                            />
-                            <AvailabilityBadge product={product} editable={editable} />
-                          </div>
-                        ) : (
-                          <AvailabilityBadge product={product} editable={editable} />
-                        )}
-                      </td>
-
-                      <td className="hidden px-4 py-2.5 text-right text-caption whitespace-nowrap text-text-disabled xl:table-cell">
-                        {timeAgo(product.updatedAt)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Card list below md — DESIGN_SYSTEM §10: tables stack into cards. */}
-            <div className={cn('divide-y divide-border md:hidden', isPlaceholderData && 'opacity-50')}>
-              {products.map((product) => (
-                <button
-                  key={product.id}
-                  type="button"
-                  onClick={() => editable && setDrawerProduct(product)}
-                  className="flex w-full flex-col gap-1.5 px-4 py-3.5 text-left"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <p className="text-body font-medium">{product.name}</p>
-                    <p className="font-numeric shrink-0 text-body font-medium">{formatMoney(product.price)}</p>
-                  </div>
-                  <p className="text-caption text-text-disabled">
-                    {product.category ?? '—'}
-                    {product.unit ? ` · ${product.unit}` : ''}
-                  </p>
-                  <AvailabilityBadge product={product} editable={editable} />
-                </button>
-              ))}
-            </div>
-          </>
+                <div className="flex justify-end">
+                  <Toggle
+                    checked={product.inStock}
+                    disabled={!editable}
+                    label={`${product.localName ?? product.name} available`}
+                    onChange={(inStock) => patch(product, { inStock })}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
         )}
-      </Panel>
 
-      {editable ? (
-        <ProductDrawer
-          product={drawerProduct === 'new' || drawerProduct === null ? null : drawerProduct}
-          open={drawerProduct !== null}
-          onClose={() => setDrawerProduct(null)}
-        />
-      ) : null}
+      </div>
+
+      <div className="flex items-start gap-2.5 rounded-lg border border-border bg-surface px-3.5 py-3">
+        <Info className="mt-0.5 size-4 shrink-0 text-text-disabled" aria-hidden />
+        <p className="text-small text-text-secondary">
+          Products are never deleted. Switch one off and customers stop being offered
+          it, while every past order still reads correctly.
+          {editable
+            ? ' Price and stock save as you type — there is no Save button to forget.'
+            : ''}
+        </p>
+      </div>
     </>
   );
 }
 
 export function InventoryPage() {
   const session = useSession();
-  const retailer = session.data?.retailer;
+  const shop = session.data?.shop;
+  const [addOpen, setAddOpen] = useState(false);
+  const editable = shop?.inventoryMode === 'managed';
 
   return (
     <>
       <PageHeader
+        eyebrow="What the shop sells"
         title="Inventory"
-        subtitle={
-          retailer
-            ? retailer.inventoryMode === 'managed'
-              ? 'Managed in this portal'
-              : 'Synced from your billing system'
-            : null
+        actions={
+          editable ? (
+            <Button variant="primary" onClick={() => setAddOpen(true)}>
+              <Plus className="size-3.5" aria-hidden />
+              Add from catalogue
+            </Button>
+          ) : undefined
         }
       />
 
-      <div className="mx-auto flex max-w-content flex-col gap-4 px-4 py-6 md:px-8">
-        {retailer ? (
+      <div className="mx-auto flex max-w-content flex-col gap-5 px-4 pb-[30px] md:px-9">
+        {shop ? (
           <>
-            <SyncBanner retailer={retailer} />
-            <InventoryTable retailer={retailer} />
+            <SyncBanner shop={shop} />
+            <InventoryTable shop={shop} />
           </>
         ) : (
-          <Panel className="h-96" />
+          <Skeleton className="h-96 rounded-lg" />
         )}
       </div>
+
+      {editable ? (
+        <AddProductDrawer open={addOpen} onClose={() => setAddOpen(false)} />
+      ) : null}
     </>
   );
 }

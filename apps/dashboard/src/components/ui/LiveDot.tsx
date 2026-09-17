@@ -8,31 +8,35 @@ interface LiveDotProps {
 /**
  * Says out loud whether the 3s poll is still landing.
  *
- * Without it, a dropped connection looks identical to a quiet shop — the list
- * just sits there showing orders that may be minutes stale. On conference
- * wifi that distinction is the difference between calm and panic.
+ * Without it a dropped connection looks identical to a quiet shop — the list
+ * just sits there showing orders that may be minutes stale.
+ *
+ * The stale state is deliberately colourless: a dashed border and muted text.
+ * This is the connection's state, never the shop's, and amber here would
+ * compete with the one thing amber is for — an order that needs packing.
  */
 export function LiveDot({ state, className }: LiveDotProps) {
   const live = state === 'live';
 
   return (
-    <span className={cn('inline-flex items-center gap-1.5', className)} role="status">
-      <span className="relative flex size-1.5">
-        {live ? (
-          <span
-            className="absolute inset-0 animate-ping rounded-full bg-success"
-            aria-hidden
-          />
-        ) : null}
-        <span
-          className={cn(
-            'relative size-1.5 rounded-full',
-            live ? 'bg-success' : 'bg-warning',
-          )}
-        />
-      </span>
-      <span className={cn('text-caption', live ? 'text-text-muted' : 'text-warning-fg')}>
-        {live ? 'Live' : 'Reconnecting'}
+    <span
+      className={cn(
+        'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1',
+        live
+          ? 'border-transparent text-text-muted'
+          : 'border-dashed border-border-strong text-text-muted',
+        className,
+      )}
+    >
+      <span
+        className={cn(
+          'size-1.5 shrink-0 rounded-full',
+          live ? 'bg-success' : 'bg-text-disabled',
+        )}
+        aria-hidden
+      />
+      <span className="text-caption tracking-normal">
+        {live ? 'Live' : 'Not updating'}
       </span>
     </span>
   );

@@ -25,7 +25,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
   return (
     <div className="flex flex-col gap-1.5">
       {label ? (
-        <label htmlFor={inputId} className="label">
+        <label htmlFor={inputId} className="text-xs font-medium text-text-secondary">
           {label}
         </label>
       ) : null}
@@ -43,12 +43,12 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
           aria-invalid={error ? true : undefined}
           aria-describedby={describedBy}
           className={cn(
-            'h-10 w-full rounded-md border bg-surface px-2.5 text-body text-text shadow-xs',
-            'transition-colors duration-150',
+            'h-11 w-full rounded-sm border bg-surface px-3 text-body text-text',
+            'transition-[border-color,box-shadow] duration-[120ms]',
             'placeholder:text-text-disabled',
-            'focus-visible:outline-none focus-visible:ring focus-visible:ring-border-focus focus-visible:ring-offset-2',
-            'disabled:cursor-not-allowed disabled:bg-surface-sunken disabled:text-text-disabled',
-            error ? 'border-danger-border' : 'border-border-strong hover:border-text-disabled',
+            'focus:border-accent focus:outline-none focus:ring-[3px] focus:ring-accent-subtle',
+            'disabled:cursor-not-allowed disabled:bg-surface-sunken disabled:text-text-muted',
+            error ? 'border-[1.5px] border-danger-fg' : 'border-border-strong',
             leading && 'pl-9',
             trailing && 'pr-9',
             className,

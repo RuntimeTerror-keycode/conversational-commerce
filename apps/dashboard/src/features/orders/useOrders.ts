@@ -1,51 +1,54 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { advanceOrder, fetchOrder, fetchOrders } from '@/api/orders';
+import {
+  advanceFulfillment,
+  fetchFulfillment,
+  fetchFulfillments,
+} from '@/api/fulfillments';
 import { queryKeys } from '@/api/keys';
-import type { OrderListQuery, ShopkeeperTransition } from '@/api/types';
+import type { DashboardTransition, FulfillmentListQuery } from '@/api/types';
 
 /**
  * Poll every 3 seconds — docs/contracts.md §C3 rule 1, which forbids
  * websockets outright because conference wifi kills socket connections and you
  * do not notice until you are on stage.
  *
- * The full page is refetched rather than a `since`-based delta. At demo scale
- * the payload is trivial and delta-merge bugs on stage are not.
+ * The full page is refetched rather than a `since`-based delta, which the
+ * backend agreed to (Q-O7): delta-merge bugs on stage are not worth the saving.
  */
 export const ORDERS_POLL_MS = 3_000;
 
-export function useOrders(query: OrderListQuery) {
+export function useFulfillments(query: FulfillmentListQuery) {
   return useQuery({
-    queryKey: queryKeys.orders(query),
-    queryFn: () => fetchOrders(query),
+    queryKey: queryKeys.fulfillments(query),
+    queryFn: () => fetchFulfillments(query),
     refetchInterval: ORDERS_POLL_MS,
     refetchIntervalInBackground: false,
     placeholderData: (previous) => previous,
   });
 }
 
-export function useOrder(orderId: string | null) {
+export function useFulfillment(id: number | null) {
   return useQuery({
-    queryKey: queryKeys.order(orderId ?? ''),
-    queryFn: () => fetchOrder(orderId!),
-    enabled: Boolean(orderId),
+    queryKey: queryKeys.fulfillment(id ?? 0),
+    queryFn: () => fetchFulfillment(id!),
+    enabled: id !== null,
     refetchInterval: ORDERS_POLL_MS,
   });
 }
 
-export function useAdvanceOrder() {
+export function useAdvanceFulfillment() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ orderId, status }: { orderId: string; status: ShopkeeperTransition }) =>
-      advanceOrder(orderId, status),
-    onSuccess: (order) => {
-      queryClient.setQueryData(queryKeys.order(order.id), order);
+    mutationFn: ({ id, status }: { id: number; status: DashboardTransition }) =>
+      advanceFulfillment(id, status),
+    onSuccess: (fulfillment) => {
+      queryClient.setQueryData(queryKeys.fulfillment(fulfillment.id), fulfillment);
     },
     // Refetch on failure too: a 409 means someone else moved it, and the
     // honest response is to show what it actually is now.
     onSettled: () => {
-      void queryClient.invalidateQueries({ queryKey: ['orders'] });
-      void queryClient.invalidateQueries({ queryKey: queryKeys.stats });
+      void queryClient.invalidateQueries({ queryKey: ['fulfillments'] });
     },
   });
 }

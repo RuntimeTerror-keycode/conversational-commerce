@@ -1,5 +1,5 @@
 import { ChevronRight } from 'lucide-react';
-import type { OrderSummary, ShopkeeperTransition } from '@/api/types';
+import type { DashboardTransition, FulfillmentSummary } from '@/api/types';
 import { Button } from '@/components/ui/Button';
 import { formatMoney, plural, timeAgo } from '@/lib/format';
 import { cn } from '@/lib/cn';
@@ -7,9 +7,9 @@ import { StatusBadge, statusRail } from './StatusBadge';
 import { nextAction } from './lifecycle';
 
 interface OrderRowProps {
-  order: OrderSummary;
-  onOpen: (orderId: string) => void;
-  onAdvance?: (orderId: string, status: ShopkeeperTransition) => void;
+  order: FulfillmentSummary;
+  onOpen: (id: number) => void;
+  onAdvance?: (id: number, status: DashboardTransition) => void;
   pending?: boolean;
   /** Staggers the entry animation down the list. */
   index?: number;
@@ -43,13 +43,13 @@ export function OrderRow({ order, onOpen, onAdvance, pending, index = 0 }: Order
             <span className="font-numeric text-body font-semibold">{order.orderCode}</span>
             <StatusBadge status={order.status} />
             <span className="text-caption whitespace-nowrap text-text-disabled">
-              {timeAgo(order.placedAt)}
+              {order.acceptedAt ? timeAgo(order.acceptedAt) : '—'}
             </span>
           </div>
 
           <div className="mt-1 flex items-center gap-1.5 text-small text-text-secondary">
             <span className="truncate font-medium">
-              {order.customer.displayName ?? order.customer.ref}
+              {order.customer.displayName ?? order.customer.phone}
             </span>
             <span className="text-text-disabled" aria-hidden>·</span>
             <span className="font-numeric whitespace-nowrap text-text-muted">
@@ -58,19 +58,18 @@ export function OrderRow({ order, onOpen, onAdvance, pending, index = 0 }: Order
           </div>
 
           {/*
-            docs/contracts.md §C3 rule 3 — the customer's own words, visible
-            without opening the order. It is the single best on-screen proof
-            the assistant understood something, so it gets a real treatment
-            rather than a grey aside.
+            docs/contracts.md §C3 rule 3 wants the customer's own phrasing here.
+            GET /api/fulfillments does not return it — `sourceText` exists only
+            on the detail response — so the row shows the delivery type and the
+            phrasing appears the moment the drawer opens. Raised as a blocker;
+            the fix is one field on FulfillmentSummary.
           */}
-          {order.firstLineSourceText ? (
-            <p className="mt-1.5 truncate text-caption text-text-muted italic">
-              “{order.firstLineSourceText}”
-            </p>
-          ) : null}
+          <p className="mt-1.5 truncate text-caption text-text-muted capitalize">
+            {order.deliveryType.replace(/_/g, ' ')}
+          </p>
         </div>
 
-        <span className="font-numeric shrink-0 text-h3">{formatMoney(order.total)}</span>
+        <span className="font-numeric shrink-0 text-h3">{formatMoney(order.subtotal)}</span>
       </button>
 
       {/* Fixed width so the price column stays aligned down the list — the

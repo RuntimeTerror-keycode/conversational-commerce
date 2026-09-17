@@ -1,9 +1,18 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { createProduct, deleteProduct, fetchProducts, updateProduct } from '@/api/inventory';
+import {
+  createProduct,
+  fetchCatalogOptions,
+  fetchProducts,
+  updateProduct,
+} from '@/api/inventory';
 import { queryKeys } from '@/api/keys';
-import type { ProductCreate, ProductListQuery, ProductPatch } from '@/api/types';
+import type {
+  InventoryCreateInput,
+  InventoryListQuery,
+  InventoryUpdateInput,
+} from '@/api/types';
 
-export function useInventory(query: ProductListQuery) {
+export function useInventory(query: InventoryListQuery) {
   return useQuery({
     queryKey: queryKeys.inventory(query),
     queryFn: () => fetchProducts(query),
@@ -15,12 +24,20 @@ export function useUpdateProduct() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ productId, patch }: { productId: string; patch: ProductPatch }) =>
-      updateProduct(productId, patch),
+    mutationFn: ({ id, patch }: { id: number; patch: InventoryUpdateInput }) =>
+      updateProduct(id, patch),
     onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: ['inventory'] });
-      void queryClient.invalidateQueries({ queryKey: queryKeys.stats });
     },
+  });
+}
+
+/** Catalogue picker for "add product". Only searches once there is a term. */
+export function useCatalogOptions(q: string) {
+  return useQuery({
+    queryKey: queryKeys.catalogOptions(q),
+    queryFn: () => fetchCatalogOptions(q),
+    enabled: q.trim().length > 1,
   });
 }
 
@@ -28,22 +45,10 @@ export function useCreateProduct() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (product: ProductCreate) => createProduct(product),
+    mutationFn: (input: InventoryCreateInput) => createProduct(input),
     onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: ['inventory'] });
-      void queryClient.invalidateQueries({ queryKey: queryKeys.stats });
-    },
-  });
-}
-
-export function useDeleteProduct() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: (productId: string) => deleteProduct(productId),
-    onSettled: () => {
-      void queryClient.invalidateQueries({ queryKey: ['inventory'] });
-      void queryClient.invalidateQueries({ queryKey: queryKeys.stats });
+      void queryClient.invalidateQueries({ queryKey: ['catalog-options'] });
     },
   });
 }

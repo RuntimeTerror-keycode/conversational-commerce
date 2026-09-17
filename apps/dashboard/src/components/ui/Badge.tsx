@@ -28,13 +28,13 @@ export function Badge({ tone = 'neutral', solid, icon: Icon, className, children
   return (
     <span
       className={cn(
-        'inline-flex items-center gap-1.5 rounded-sm border px-2 py-0.5',
-        'text-caption font-medium whitespace-nowrap',
+        'inline-flex items-center gap-1 rounded-full border py-[2px] pr-2 pl-1.5',
+        'text-[11px] font-semibold tracking-normal whitespace-nowrap',
         solid ? style.solid : style.soft,
         className,
       )}
     >
-      {Icon ? <Icon className="size-3.5 shrink-0" /> : null}
+      {Icon ? <Icon className="size-3 shrink-0" /> : null}
       {children}
     </span>
   );

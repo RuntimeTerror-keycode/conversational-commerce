@@ -1,35 +1,42 @@
 import { request } from './client';
 import type {
+  CatalogItem,
+  InventoryCreateInput,
+  InventoryListQuery,
+  InventoryListResponse,
+  InventoryUpdateInput,
   Product,
-  ProductCreate,
-  ProductListQuery,
-  ProductListResponse,
-  ProductPatch,
 } from './types';
 
-export function fetchProducts(query: ProductListQuery): Promise<ProductListResponse> {
-  return request<ProductListResponse>('/inventory', {
+export function fetchProducts(
+  query: InventoryListQuery,
+): Promise<InventoryListResponse> {
+  return request<InventoryListResponse>('/inventory', {
     query: {
       q: query.q,
       category: query.category,
       stockState: query.stockState,
       page: query.page,
       limit: query.limit,
-      sort: query.sort,
     },
   });
 }
 
-export function updateProduct(productId: string, patch: ProductPatch): Promise<Product> {
-  return request<Product>(`/inventory/${productId}`, { method: 'PATCH', body: patch });
+export function updateProduct(
+  id: number,
+  patch: InventoryUpdateInput,
+): Promise<Product> {
+  return request<Product>(`/inventory/${id}`, { method: 'PATCH', body: patch });
 }
 
-/** Managed mode only — server returns 409 read_only_inventory otherwise. */
-export function createProduct(product: ProductCreate): Promise<Product> {
-  return request<Product>('/inventory', { method: 'POST', body: product });
+/** Catalogue items this shop could stock. */
+export async function fetchCatalogOptions(q: string, limit = 25): Promise<CatalogItem[]> {
+  const result = await request<{ data: CatalogItem[] }>('/inventory/catalog', {
+    query: { q: q || undefined, limit },
+  });
+  return result.data;
 }
 
-/** Managed mode only — soft archive per docs/frontend-contract.md Q-I5. */
-export function deleteProduct(productId: string): Promise<void> {
-  return request<void>(`/inventory/${productId}`, { method: 'DELETE' });
+export function createProduct(input: InventoryCreateInput): Promise<Product> {
+  return request<Product>('/inventory', { method: 'POST', body: input });
 }

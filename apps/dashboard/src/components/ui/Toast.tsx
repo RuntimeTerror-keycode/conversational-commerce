@@ -22,16 +22,22 @@ const ToastContext = createContext<((message: string, tone?: ToastTone) => void)
   null,
 );
 
-const toneStyles: Record<ToastTone, { ring: string; icon: ReactNode | null }> = {
+/**
+ * The left bar carries the tone; the card itself stays white.
+ * Design canvas, "Toasts": 3px bar, radius 8, lifted shadow.
+ */
+const toneStyles: Record<ToastTone, { bar: string; border: string; icon: ReactNode | null }> = {
   success: {
-    ring: 'bg-success-bg text-success-fg',
-    icon: <Check className="size-3.5" aria-hidden />,
+    bar: 'bg-success',
+    border: 'border-success-border',
+    icon: <Check className="size-4 shrink-0 text-success-fg" aria-hidden />,
   },
   error: {
-    ring: 'bg-danger-bg text-danger-fg',
-    icon: <AlertCircle className="size-3.5" aria-hidden />,
+    bar: 'bg-danger-fg',
+    border: 'border-danger-border',
+    icon: <AlertCircle className="size-4 shrink-0 text-danger-fg" aria-hidden />,
   },
-  info: { ring: 'bg-surface-sunken text-text-secondary', icon: null },
+  info: { bar: 'bg-border-strong', border: 'border-border', icon: null },
 };
 
 export function ToastProvider({ children }: { children: ReactNode }) {
@@ -61,23 +67,18 @@ export function ToastProvider({ children }: { children: ReactNode }) {
               key={toast.id}
               role={toast.tone === 'error' ? 'alert' : 'status'}
               className={cn(
-                'data-[state=open]:animate-slide-up flex items-center gap-2.5 rounded-lg border border-border',
-                'bg-surface py-2.5 pr-4 pl-3 text-small text-text shadow-md',
+                'data-[state=open]:animate-slide-up flex items-center gap-2.5 overflow-hidden rounded-lg border',
+                'bg-surface py-3 pr-3.5 pl-0 text-small text-text shadow-lg',
                 'data-[swipe=end]:translate-x-(--radix-toast-swipe-end-x) data-[state=closed]:opacity-0',
+                style.border,
               )}
               onOpenChange={(open) => {
                 if (!open) dismiss(toast.id);
               }}
             >
+              <span className={cn('w-[3px] self-stretch', style.bar)} aria-hidden />
               {style.icon ? (
-                <span
-                  className={cn(
-                    'flex size-5 shrink-0 items-center justify-center rounded-full',
-                    style.ring,
-                  )}
-                >
-                  {style.icon}
-                </span>
+                <span className="flex shrink-0 items-center pl-1">{style.icon}</span>
               ) : null}
               <RadixToast.Description>{toast.message}</RadixToast.Description>
             </RadixToast.Root>
