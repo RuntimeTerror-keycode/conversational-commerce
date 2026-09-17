@@ -44,6 +44,9 @@ importers:
 
   apps/api:
     dependencies:
+      '@cc/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
       '@cc/domain':
         specifier: workspace:*
         version: link:../../packages/domain

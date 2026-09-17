@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { AppError } from '@cc/domain';
+import { WhatsappSearchRequest, WhatsappSelectRequest } from '@cc/contracts';
 import { WhatsappService } from '../services/whatsapp.service';
-import { WhatsappSearchRequest, WhatsappSelectRequest } from '../types';
 
 export class WhatsappController {
   private readonly service: WhatsappService;
@@ -12,21 +12,21 @@ export class WhatsappController {
 
   /** POST /api/whatsapp/orders/search */
   public search = async (req: Request, res: Response): Promise<void> => {
-    const body = req.body as Partial<WhatsappSearchRequest>;
-    if (!body.messageId || !body.customerRef || !body.text || !body.address) {
-      throw AppError.badRequest('messageId, customerRef, text and address are required');
+    const parsed = WhatsappSearchRequest.safeParse(req.body);
+    if (!parsed.success) {
+      throw AppError.badRequest('Invalid request body', { issues: parsed.error.issues });
     }
-    const result = await this.service.search(body as WhatsappSearchRequest);
+    const result = await this.service.search(parsed.data);
     res.status(200).json(result);
   };
 
   /** POST /api/whatsapp/orders/select */
   public select = async (req: Request, res: Response): Promise<void> => {
-    const body = req.body as Partial<WhatsappSelectRequest>;
-    if (!body.customerRef || body.orderId === undefined || body.productId === undefined) {
-      throw AppError.badRequest('customerRef, orderId and productId are required');
+    const parsed = WhatsappSelectRequest.safeParse(req.body);
+    if (!parsed.success) {
+      throw AppError.badRequest('Invalid request body', { issues: parsed.error.issues });
     }
-    const result = await this.service.select(body as WhatsappSelectRequest);
+    const result = await this.service.select(parsed.data);
     res.status(200).json(result);
   };
 }
