@@ -4,6 +4,8 @@ import {
   CatalogSearchService,
   RetailerResolveService,
   SessionService,
+  classifyMatches,
+  formatIndianPrice,
 } from '@cc/domain';
 import { Logger } from '../logger/logger';
 import {
@@ -54,33 +56,34 @@ export class WhatsappService {
       resultCount: products.length,
     });
 
-    if (products.length === 0) {
-      return {
-        customerRef: req.customerRef,
-        orderId: session.orderId,
-        tag: 'not_found',
-        body: `Sorry, we couldn't find that at ${primary.name}.`,
-      };
-    }
-
-    const rows: WhatsappRow[] = products.map((p) => ({
+    const toRow = (p: (typeof products)[number]): WhatsappRow => ({
       id: Number(p.id),
       title: p.name,
       description: p.brand ?? undefined,
-      price: this.formatPrice(p.price),
-    }));
+      price: formatIndianPrice(p.price),
+    });
 
-    if (products.length === 1) {
-      return { customerRef: req.customerRef, orderId: session.orderId, tag: 'found', rows };
+    const match = classifyMatches(products);
+
+    switch (match.kind) {
+      case 'none':
+        return {
+          customerRef: req.customerRef,
+          orderId: session.orderId,
+          tag: 'not_found',
+          body: `Sorry, we couldn't find that at ${primary.name}.`,
+        };
+      case 'single':
+        return { customerRef: req.customerRef, orderId: session.orderId, tag: 'found', rows: [toRow(match.item)] };
+      case 'multiple':
+        return {
+          customerRef: req.customerRef,
+          orderId: session.orderId,
+          tag: 'choice',
+          body: `Found a few options for "${req.text}" — which one?`,
+          rows: match.items.map(toRow),
+        };
     }
-
-    return {
-      customerRef: req.customerRef,
-      orderId: session.orderId,
-      tag: 'choice',
-      body: `Found a few options for "${req.text}" — which one?`,
-      rows,
-    };
   }
 
   public async select(req: WhatsappSelectRequest): Promise<WhatsappSelectResponse> {
@@ -115,9 +118,5 @@ export class WhatsappService {
     });
 
     return { customerRef: req.customerRef, orderId: req.orderId, tag: 'added', cart };
-  }
-
-  private formatPrice(price: number): string {
-    return Number.isInteger(price) ? `Rs ${price}` : `Rs ${price.toFixed(2)}`;
   }
 }
