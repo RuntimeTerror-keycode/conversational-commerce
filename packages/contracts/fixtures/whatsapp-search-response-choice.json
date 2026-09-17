@@ -1,0 +1,10 @@
+{
+  "customerRef": "919999999999",
+  "orderId": 1,
+  "tag": "choice",
+  "body": "Rice ind. Ethu venam?",
+  "rows": [
+    { "id": 22, "title": "Jaya rice 5kg", "description": "Jaya", "price": "Rs 320" },
+    { "id": 23, "title": "Matta rice 5kg", "description": "Palakkadan", "price": "Rs 380" }
+  ]
+}

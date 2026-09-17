@@ -10,3 +10,5 @@ __pycache__/
 *.db-shm
 *.db-wal
 .DS_Store
+
+apps/api/package-lock.json

@@ -86,8 +86,8 @@ These live in `src/domain/` and are shared with the dashboard routes. Signatures
 ```ts
 searchProducts(retailerId: string, query: string, opts?): Promise<Product[]>
 checkAvailability(retailerId: string, productIds: string[]): Promise<AvailabilityResult[]>
-getCart(customerId: string, retailerId: string): Promise<Cart>
-mutateCart(customerId: string, retailerId: string, op: CartOp): Promise<Cart>  // returns FULL cart
+getCart(retailerId: string, customerId: string): Promise<Cart>
+mutateCart(retailerId: string, customerId: string, op: CartOp): Promise<Cart>  // returns FULL cart
 createOrder(cartId: string, opts): Promise<Order>
 transitionOrder(orderId: string, to: OrderStatus): Promise<Order>  // emits notify
 resolveRetailer(customerRef: string): Promise<{ retailerId: string; name: string; area: string }>
@@ -99,25 +99,89 @@ resolveRetailer(customerRef: string): Promise<{ retailerId: string; name: string
 
 ### C2. Dashboard REST for the frontend
 
+#### Session — how the FE identifies itself
+
+No passwords. The FE sends a `username`, the API resolves the shop.
+
 ```
-GET   /api/orders?status=&since=        → Order[]     (poll every 3s)
-GET   /api/orders/:id                   → Order
-PATCH /api/orders/:id  { status }       → Order       (accept / reject)
-PATCH /api/orders/:id/items/:lineId     → Order       (substitute / adjust qty)
-GET   /api/inventory?q=                 → Product[]
-PATCH /api/inventory/:id  { inStock, price } → Product
+POST  /api/identify       { "username": "suresh" }
+```
+```jsonc
+// Response 200
+{
+  "user": {
+    "id": 1,
+    "username": "suresh",
+    "name": "Suresh Kumar",
+    "role": "owner"
+  },
+  "shop": {
+    "id": 1,
+    "name": "Fresh Mart Kochi",
+    "isActive": true
+  }
+}
+```
+```jsonc
+// Response 401 — username not found or user inactive
+{ "error": "unknown_user", "message": "No active user with that username" }
 ```
 
-Order status enum, shared verbatim with FE:
-`draft | placed | accepted | rejected | packed | out_for_delivery | delivered`
+The FE stores the returned `shop.id` and passes it as the **`X-Shop-Id`** header on every subsequent request. The API validates this header on every route — if missing or invalid, return `400`.
+
+#### All routes below require `X-Shop-Id` header
+
+**Fulfillments** — the shop's slice of a customer order. The customer's full order (`master_order`) may span multiple shops; each shop sees only their fulfillment(s).
+
+```
+GET    /api/fulfillments?status=&since=          → Fulfillment[]   (poll every 3s)
+GET    /api/fulfillments/:id                     → Fulfillment
+PATCH  /api/fulfillments/:id      { status }     → Fulfillment     (advance status)
+PATCH  /api/fulfillments/:id/items/:lineId       → Fulfillment     (substitute / adjust qty)
+```
+
+**Inventory**
+
+```
+GET    /api/inventory?q=                         → Product[]
+PATCH  /api/inventory/:id  { inStock, price }    → Product
+```
+
+**Scoping rule:** every query filters by the `shopId` from the header. A shop can never see another shop's orders or inventory.
+
+**Flow summary:**
+1. Dashboard loads → user types username → `POST /api/identify`
+2. FE stores `shopId` from response
+3. Every API call includes `X-Shop-Id: <shopId>` header
+4. Backend validates header, scopes all queries to that shop
+
+Fulfillment status enum (what the dashboard works with):
+`accepted | packed | out_for_delivery | delivered | rejected`
+
+The system auto-accepts every order. `draft` and `placed` exist only on `master_order` and are never visible to the dashboard. A fulfillment is born `accepted` — the shopkeeper advances it from there:
+
+```
+accepted → packed → out_for_delivery → delivered
+```
+
+`rejected` is kept in the enum defensively but nothing in the current product produces it.
+
+**Status transitions the dashboard can make:**
+| From | To | Button label |
+|---|---|---|
+| `accepted` | `packed` | Mark packed |
+| `packed` | `out_for_delivery` | Out for delivery |
+| `out_for_delivery` | `delivered` | Mark delivered |
+
+`out_for_delivery` and `delivered` transitions emit `POST /notify` to the edge (§A2).
 
 ### C3. What we need the FE dev to agree to
 
-1. **Poll, do not use websockets.** `GET /api/orders?since=` every 3 seconds. Conference wifi kills socket connections and you will not notice until you are on stage.
-2. **Accept and reject must be one click each,** no confirmation modal. The demo is a live loop — every extra click is dead air.
+1. **Poll, do not use websockets.** `GET /api/fulfillments?since=` every 3 seconds. Conference wifi kills socket connections and you will not notice until you are on stage.
+2. **No accept or reject in the dashboard.** Orders are auto-accepted by the system. Fulfillments arrive already `accepted` — the shopkeeper's job starts at packing.
 3. **Show the customer's original phrasing on the order line.** "2 kg ari" next to "Rice 2kg" is the single best proof the AI did something. Backend will include `sourceText` on each line item.
 4. **Do not build inventory editing until orders work.** It is the more impressive screen and the less important one.
-5. **Order list sorted newest first, with a visible unaccepted count.** That badge is what judges look at.
+5. **Fulfillment list sorted newest first, with a visible new-order count badge.** That badge counts `accepted` fulfillments (work waiting). It is what judges look at.
 
 ---
 
@@ -161,3 +225,143 @@ Constraints the AI service enforces before returning (do not rely on prompting):
 Everything else can be negotiated while building. These four cannot.
 
 Both sides should stub the other immediately: the edge hardcodes a `blocks` response so WhatsApp plumbing can be tested without a working agent, and the AI service tests via curl without WhatsApp. That parallelism is worth more than any other decision on this list.
+
+---
+
+## Changelog
+
+| Date | What changed | Why |
+|---|---|---|
+| 2026-09-16 | **§C2: Session added.** `POST /api/identify { username }` → user + shop. All routes require `X-Shop-Id` header. No passwords — hackathon-grade auth. | `shop_user` table with unique `username` added to DB. FE needs a way to identify which shop to scope to. |
+| 2026-09-16 | **§C2: `/api/orders` → `/api/fulfillments`.** Dashboard shows the shop's fulfillment slice, not the customer's master order. | DB is multi-vendor: `master_order` (customer) → `fulfillment` (per-shop). Each shop only sees their fulfillments. |
+| 2026-09-16 | **§C2: Fulfillment status enum replaces order status enum.** Dashboard works with `accepted \| packed \| out_for_delivery \| delivered \| rejected`. `draft` and `placed` are master_order-only, never visible. | Auto-accept means fulfillments are born `accepted`. |
+| 2026-09-16 | **§C2: Status transition table added.** `accepted → packed → out_for_delivery → delivered`, with button labels. | Makes it unambiguous what the FE renders. |
+| 2026-09-16 | **§C3 rule 2: Accept/reject removed.** Was "one click each" — now "No accept or reject in the dashboard." Auto-accept is the only path. | Product decision 2026-09-15: system auto-accepts, shopkeeper only does fulfilment. |
+| 2026-09-16 | **§C3 rule 5: Badge changed.** Was "unaccepted count" — now counts `accepted` fulfillments (new work waiting). | Dashboard never sees unaccepted orders. |
+| 2026-09-16 | **§C1: `customer.wa_id` → `customer.phone`** in DB. Same data, clearer name. | Aligns with `shop_user.phone` naming. |
+
+### Responses to `docs/frontend-contract.md` proposals
+
+The FE dev's analysis (`docs/frontend-contract.md`) proposed designs and raised questions tagged `Q-*`. Below is the BE position on each, based on what is now built.
+
+**Auth (§7.1)**
+
+| FE proposed | BE decision |
+|---|---|
+| `POST /api/auth/login { identifier, password }` + httpOnly cookie | **Replaced.** `POST /api/identify { username }` — no password, no cookie. FE gets `shopId` and sends it as `X-Shop-Id` header. |
+| `GET /api/auth/me` for session bootstrap | **Dropped.** FE just calls `/api/identify` again on reload. |
+| `POST /api/auth/logout` | **Dropped.** No session to clear. |
+| `retailerId` derived server-side, never sent by FE | **Changed.** FE explicitly sends `X-Shop-Id` header. Simpler for hackathon — no cookie/CORS complexity. Server validates the header value exists and is active. |
+| Q-A1 (cookie vs JWT) | **Neither.** Stateless header. |
+| Q-A2 (login identity) | **Username**, not phone+password. |
+| Q-A3 (session lifetime) | **N/A.** No session to expire. Dashboard stays alive indefinitely. |
+| Q-A4 (auth at all for hackathon?) | **Minimal.** Username lookup only. No password, no token. |
+| Q-A5 (roles) | `shop_user.role` is `'owner' \| 'staff'` in the DB. No permission gating for hackathon. |
+
+**Orders → Fulfillments (§7.2)**
+
+| FE proposed | BE decision |
+|---|---|
+| `/api/orders` routes | **Renamed to `/api/fulfillments`.** The dashboard shows the shop's slice, not the customer's master order. DB: `master_order` → `fulfillment` (per-shop). |
+| Order status: `draft \| placed \| ... \| delivered` | **Fulfillment status: `accepted \| packed \| out_for_delivery \| delivered \| rejected`.** `draft` and `placed` are `master_order`-only. |
+| FE never sends `accepted` or `rejected` (§2) | **Confirmed.** Auto-accept is the only path. PATCH only accepts `packed`, `out_for_delivery`, `delivered`. |
+| Q-O1 (Order type exists?) | **No shared type yet.** The fulfillment response shape is TBD during implementation. FE's proposed `OrderSummary` / `Order` shapes in §7.2 are a reasonable starting point — rename `Order` → `Fulfillment`. |
+| Q-O3 (cancellation) | **No `cancelled` state.** Not in scope for hackathon. |
+| Q-O4 (delivery vs pickup) | **Both.** `master_order.delivery_type` is `'delivery' \| 'pickup'`. |
+| Q-O5 (payment) | **COD only.** `master_order.payment_mode` defaults to `'cod'`. |
+| Q-O6 (events audit trail) | **Yes.** `order_event` table exists in the DB — stores timestamped events with `actor` and `event_type`. |
+| Q-O7 (polling: full page vs delta) | **Full page.** Agree with FE recommendation — delta-merge bugs on stage are not worth the savings. |
+| Q-O8 (line edits in which status) | **`accepted` only.** Once packed, line items are frozen. |
+| Q-O9 (update §C3/spec.md) | **Done.** §C3 updated in this file. |
+| Q-O11 (auto-accept delay) | **Immediate.** No 60s wait. Fulfillment is born `accepted`. |
+| Q-O12 (can rejected occur?) | **Defensively kept in enum.** Nothing produces it today. Render it if it appears, don't build UI to trigger it. |
+| Q-O13 (who auto-accepts) | **`apps/api`** owns order placement and auto-accept. It calls `POST /notify` to the edge. |
+
+**Inventory (§7.3)**
+
+| FE proposed | BE decision |
+|---|---|
+| `stockQuantity` alongside boolean `inStock` | **Yes.** `shop_product` has both `stock_quantity` (integer) and `is_available` (boolean). |
+| Q-I1 (when does decrement fire) | **At `accepted`** (= order time, since auto-accept is immediate). |
+| Q-I2 (`inStock` auto-false at zero?) | **Yes.** Application logic sets `is_available = false` when `stock_quantity` hits 0. |
+| Q-I3 (external mode editable?) | **Nothing editable.** Read-only mirror with sync. |
+| Q-I4 (aliases editable?) | **Yes.** `tag` table exists. Shopkeeper can add search aliases. |
+| Q-I5 (soft delete?) | **Soft archive.** Products in historical orders must still resolve. |
+| Q-I6 (CSV import) | **Not for hackathon.** Seed data covers demo. |
+| Q-I7 (categories/images) | **Categories yes** (`category` table). **Images no** — not in scope. |
+| Q-I10 (low stock) | **Yes.** `shop_product.low_stock_threshold` exists, defaults to 5. |
+
+**Response shapes (§7.0)**
+
+| FE proposed | BE decision |
+|---|---|
+| List envelope `{ data, page, counts }` | **Accepted.** Bare arrays can't carry badge counts. |
+| Error envelope `{ status, code, message, details }` | **Accepted.** Aligns with existing `ErrorHandler` shape. |
+| 409 with `details.order` on conflict | **Accepted.** |
+| Q-X1 (money: paise or rupees) | **Decimal rupees** — `DECIMAL(10,2)` in the DB. `320.00` = ₹320. |
+| Q-X2 (list envelope) | **Yes** — see above. |
+| Q-X3 (who owns `/notify`) | **`apps/api`** — it owns order mutation and status transitions. **Implemented 2026-09-17**, see changelog below. |
+| Q-X5 (shared types in `packages/contracts`?) | **Yes.** Dashboard types go in `packages/contracts`. Python mirror only for types the edge needs. |
+| Q-X6 (deploy origin) | **Localhost for hackathon.** CORS allows `http://localhost:*`. |
+
+**Dashboard (§3)**
+
+| FE proposed | BE decision |
+|---|---|
+| Q-D1 (separate home page?) | **No.** Orders-is-home + KPI strip. Agree with FE. |
+| Q-D2 (`GET /api/stats/summary`) | **Derive from counts blocks.** No separate stats endpoint for hackathon. |
+| Q-D3 (KPI strip worth it?) | **Yes** — but only if orders are done first. |
+
+**Customer data**
+
+| FE proposed | BE decision |
+|---|---|
+| Q-C1 (show full phone?) | **Yes.** Shopkeeper needs it for delivery. `customer.phone` is exposed. |
+| Q-C2 (customer name?) | **Yes.** `customer.display_name` — nullable, populated from WhatsApp profile or first message. |
+| Q-C3 (past orders?) | **Not for hackathon.** |
+
+**Settings / UI — FE's call, not blocked on BE**
+
+| Question | Position |
+|---|---|
+| Q-S1 (auto-accept configurable?) | Not for hackathon. Immediate, not configurable. |
+| Q-S2 (shop open/closed toggle) | Not for hackathon. Crosses into agent behaviour. |
+| Q-S3 (opening hours) | DB has `shop.opening_time` / `closing_time`. No enforcement yet. |
+| Q-U1–U5 | FE's choice. No BE dependency. |
+
+---
+
+## 2026-09-17 — `/notify` outbound call implemented (Q-X3, spec.md §14 item 1)
+
+`apps/api` now actually calls `POST {EDGE_BASE_URL}/notify` (previously: decided but never
+built, on any branch — the DB got updated and the loop stopped there). Three call sites:
+
+- `OrderController.place` → `reason: order_accepted`, right after `createOrder` succeeds
+  (fulfillments default to `status='accepted'`, so there's no separate dashboard "accept"
+  action to hang this off of — see `apps/api/src/services/order-notify.service.ts`).
+- `FulfillmentService.updateStatus` → `reason: out_for_delivery`, on that one transition only
+  (`packed`/`delivered` don't map to a `NotifyRequest` reason).
+- `FulfillmentService.updateItem` → `reason: substitution`, on the `substituteProductId` branch.
+
+`order_rejected` is defined in the reason type but has no caller — `rejected` still isn't
+dashboard-settable (spec.md §14 item 3, unresolved). Auth reuses the existing
+`SERVICE_SHARED_SECRET`/`X-Service-Token` pattern edge already validates on this endpoint.
+Failures are logged and swallowed, never fail the retailer's underlying action. Verified live
+against a running `apps/edge` (stub Meta send, no real WhatsApp creds) for all three reasons,
+plus a resilience check with edge killed mid-request.
+
+---
+
+## 2026-09-17 — WhatsApp search/select ships api-direct, agent bypassed for now
+
+Provisional answer to open question 13 in root `spec.md` §14 ("Reconcile WhatsApp
+`found`/`choice` tags with `ReplyBlock`"): `apps/agent` isn't built yet, so `apps/edge`
+calls two new synchronous `apps/api` endpoints directly — `POST /api/whatsapp/orders/search`
+and `POST /api/whatsapp/orders/select` (full shapes in `apps/Whatsapp contract.md`), auth'd
+with the same `X-Service-Token` pattern as `POST /notify` above. This is **not** a
+replacement for the `/agent/turn` → `ReplyBlock` → edge-adapter design described in §A/§D
+above — it's what unblocks the demo before `apps/agent` exists. When `apps/agent` ships,
+the `packages/domain` calls these endpoints make (`CatalogSearchService`, `CartService`,
+`SessionService`) should move behind Mastra tools, and the `found`/`choice`/`not_found`/
+`added`/`unavailable` tags should be reconciled with `ReplyBlock` in the edge adapter as
+originally planned. See root `spec.md` §14 item 14 for the full note.

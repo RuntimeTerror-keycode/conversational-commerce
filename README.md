@@ -28,15 +28,20 @@ symlink pnpm creates there. It's `.gitignore`'d, same as every other
 ## Status
 
 - `apps/edge` verifies the Meta webhook signature, acks 200 immediately, then
-  calls `apps/agent` in a background task and logs the stubbed outbound send.
+  calls `apps/agent` in a background task. Text, voice (Sarvam STT), location,
+  and button/list replies all become an agent turn. Outbound `ReplyBlock`s
+  are sent through the Meta Cloud API when a token is set, otherwise logged.
+  `POST /notify` renders retailer status updates the same way. `/docs` still
+  exposes the WhatsApp trigger endpoints for sending without a customer message.
 - `apps/agent` runs a real Mastra `shopping-agent` (full tool set: search,
   cart, availability, confirmation gate, placeOrder) behind `POST
-  /agent/turn`. Every tool is a stub — fake in-memory data, not
-  `packages/domain` (BE devs' side). Reply blocks are v1: always one `text`
-  block, no `buttons`/`list`/`cart_summary` yet. See `apps/agent/README.md`.
-- `apps/api` exists as a bare skeleton (`GET /health` only) — dashboard
-  routes land once `packages/domain` exists.
-- `packages/domain` and Postgres are not wired up yet.
+  /agent/turn`, backed by `packages/domain`. Reply blocks are v1: always one
+  `text` block, no `buttons`/`list`/`cart_summary` yet. See
+  `apps/agent/README.md`.
+- `apps/api` serves the dashboard REST routes and the WhatsApp search/select
+  endpoints, both on top of `packages/domain`.
+- `packages/domain` holds the shared cart, catalog, retailer and order-placement
+  services, backed by Postgres.
 
 ## Setup
 
@@ -45,8 +50,16 @@ symlink pnpm creates there. It's `.gitignore`'d, same as every other
     make db
     make agent      # terminal 1
     make api        # terminal 2
-    make edge       # terminal 3
+    make edge       # terminal 3 — or `make edge-docker`
     make dashboard  # terminal 4
+
+WhatsApp edge in Docker (ffmpeg + Meta webhook + STT):
+
+    cp .env.example .env   # fill Meta / Sarvam / ngrok keys
+    make edge-docker       # http://localhost:8000/docs
+
+The container reaches a host-side agent at `host.docker.internal:4111`.
+Keep `make agent` running if you want inbound WhatsApp turns to complete.
 
 ## Tests
 

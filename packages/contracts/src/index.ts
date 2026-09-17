@@ -65,3 +65,84 @@ export type ReplyBlock = z.infer<typeof ReplyBlock>;
 export type AgentTurnRequest = z.infer<typeof AgentTurnRequest>;
 export type AgentTurnResponse = z.infer<typeof AgentTurnResponse>;
 export type NotifyRequest = z.infer<typeof NotifyRequest>;
+
+// ---------------------------------------------------------------------------
+// WhatsApp order search/select — POST /api/whatsapp/orders/{search,select}
+// Deliberate, temporary bypass of the agent (see root spec.md §14 item 13);
+// apps/edge calls apps/api directly and renders the response synchronously.
+// ---------------------------------------------------------------------------
+
+export const WhatsappAddress = z.object({
+  addressLine: z.string().optional(),
+  latitude: z.number(),
+  longitude: z.number(),
+});
+
+export const WhatsappSearchRequest = z.object({
+  messageId: z.string(),
+  customerRef: z.string(),
+  text: z.string(),
+  source: z.enum(["text", "voice"]),
+  timestamp: z.string(),
+  address: WhatsappAddress,
+  paymentMode: z.enum(["COD", "GPAY"]),
+});
+
+export const WhatsappRow = z.object({
+  id: z.number().int(),
+  title: z.string(),
+  description: z.string().optional(),
+  price: z.string(),
+});
+
+export const WhatsappSearchResponse = z.discriminatedUnion("tag", [
+  z.object({ customerRef: z.string(), orderId: z.number().int(), tag: z.literal("found"), rows: z.array(WhatsappRow) }),
+  z.object({ customerRef: z.string(), orderId: z.number().int(), tag: z.literal("choice"), body: z.string(), rows: z.array(WhatsappRow) }),
+  z.object({ customerRef: z.string(), orderId: z.number().int(), tag: z.literal("not_found"), body: z.string() }),
+]);
+
+export const WhatsappSelectRequest = z.object({
+  customerRef: z.string(),
+  orderId: z.number().int(),
+  productId: z.number().int(),
+});
+
+export const WhatsappCartLine = z.object({
+  lineId: z.string(),
+  productName: z.string(),
+  quantity: z.number(),
+  unit: z.string(),
+  price: z.number(),
+});
+
+export const WhatsappCart = z.object({
+  items: z.array(WhatsappCartLine),
+  total: z.number(),
+  currency: z.literal("INR"),
+  priceNote: z.string().optional(),
+});
+
+export const WhatsappSubstitute = z.object({
+  id: z.number().int(),
+  name: z.string(),
+  unit: z.string(),
+  price: z.number(),
+});
+
+export const WhatsappSelectResponse = z.discriminatedUnion("tag", [
+  z.object({ customerRef: z.string(), orderId: z.number().int(), tag: z.literal("added"), cart: WhatsappCart }),
+  z.object({
+    customerRef: z.string(), orderId: z.number().int(), tag: z.literal("unavailable"),
+    body: z.string(), substitutes: z.array(WhatsappSubstitute),
+  }),
+]);
+
+export type WhatsappAddress = z.infer<typeof WhatsappAddress>;
+export type WhatsappSearchRequest = z.infer<typeof WhatsappSearchRequest>;
+export type WhatsappRow = z.infer<typeof WhatsappRow>;
+export type WhatsappSearchResponse = z.infer<typeof WhatsappSearchResponse>;
+export type WhatsappSelectRequest = z.infer<typeof WhatsappSelectRequest>;
+export type WhatsappCartLine = z.infer<typeof WhatsappCartLine>;
+export type WhatsappCart = z.infer<typeof WhatsappCart>;
+export type WhatsappSubstitute = z.infer<typeof WhatsappSubstitute>;
+export type WhatsappSelectResponse = z.infer<typeof WhatsappSelectResponse>;
