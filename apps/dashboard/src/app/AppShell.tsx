@@ -5,7 +5,7 @@ import { useInventory } from '@/features/inventory/useInventory';
 import { useSession } from '@/features/auth/useSession';
 import { shopStatusMeta, formatHours } from '@/features/settings/shopStatus';
 import { useShopSettings } from '@/features/settings/useShopSettings';
-import { timeAgo } from '@/lib/format';
+import { AccountMenu } from './AccountMenu';
 import { cn } from '@/lib/cn';
 
 interface NavItem {
@@ -30,7 +30,7 @@ function useNavItems(): NavItem[] {
   const low = stock?.counts.low ?? 0;
 
   return [
-    { to: '/', label: 'Dashboard', icon: LayoutGrid, end: true },
+    { to: '/', label: 'Today', icon: LayoutGrid, end: true },
     { to: '/orders', label: 'Orders', icon: ClipboardList, badge: data?.counts.accepted },
     { to: '/history', label: 'Order history', icon: Clock },
     { to: '/inventory', label: 'Inventory', icon: Boxes, note: low ? `${low} low` : undefined },
@@ -71,27 +71,29 @@ function SidebarLink({ item }: { item: NavItem }) {
 export function AppShell() {
   const session = useSession();
   const items = useNavItems();
-  const { data: settings, dataUpdatedAt, isError } = useShopSettings();
+  const { data: settings } = useShopSettings();
 
-  const shop = session.data?.shop;
-  const openState = settings?.openState ?? shop?.openState;
-  const status = openState ? shopStatusMeta[openState] : null;
-  const hours = formatHours(
-    settings?.openingTime ?? shop?.openingTime ?? null,
-    settings?.closingTime ?? shop?.closingTime ?? null,
-  );
+  const session_ = session.data?.shop;
+
+  /*
+    Once `/shops/me` has answered it is the only truth about the shop's hours.
+    Merging field-by-field with `??` looked harmless but was not: clearing the
+    hours sets them to `null`, `??` reads that as "absent", and the sidebar
+    fell back to the stale session in localStorage — so a shop the shopkeeper
+    had just set to 24 hours kept advertising 07:00 – 22:00 in the corner of
+    every screen. The session is a first-paint placeholder, nothing more.
+  */
+  const shop = settings ?? session_;
+  const status = shop?.openState ? shopStatusMeta[shop.openState] : null;
+  const hours = formatHours(shop?.openingTime ?? null, shop?.closingTime ?? null);
 
   return (
-    <div className="flex min-h-screen bg-canvas">
+    <div className="flex h-screen overflow-hidden bg-canvas">
       <aside className="fixed inset-y-0 hidden w-sidebar flex-col border-r border-sidebar-border bg-sidebar md:flex">
         <div className="flex flex-col gap-3 border-b border-sidebar-border px-4.5 pt-5.5 pb-4.5">
-          <div className="flex flex-col gap-[3px]">
-            <p className="truncate text-h2">{shop?.name ?? '—'}</p>
-            <p className="truncate text-xs text-text-muted">
-              {[settings?.ownerName, session.data?.user.name]
-                .filter(Boolean)[0] ?? ''}
-            </p>
-          </div>
+          <p className="truncate text-[17px] font-semibold tracking-[-0.01em]">
+            {shop?.name ?? session_?.name ?? '—'}
+          </p>
 
           {/*
             The shop's state lives here, not in the page header — it is a
@@ -126,20 +128,9 @@ export function AppShell() {
           ))}
         </nav>
 
-        <div className="mt-auto flex items-center gap-2 border-t border-sidebar-border px-4.5 py-3.5">
-          <span
-            className={cn(
-              'size-[7px] shrink-0 rounded-full',
-              isError ? 'bg-text-disabled' : 'bg-accent',
-            )}
-            aria-hidden
-          />
-          <span className="font-numeric text-xs text-text-muted">
-            {isError
-              ? 'Not updating'
-              : `Live · updated ${dataUpdatedAt ? timeAgo(new Date(dataUpdatedAt).toISOString()) : 'just now'}`}
-          </span>
-        </div>
+
+        <div className="mt-auto" />
+        <AccountMenu />
       </aside>
 
       {/*
@@ -173,7 +164,7 @@ export function AppShell() {
         ))}
       </nav>
 
-      <main className="min-w-0 flex-1 pb-20 md:ml-sidebar md:pb-0">
+      <main className="flex min-w-0 flex-1 flex-col overflow-hidden pb-20 md:ml-sidebar md:pb-0">
         <Outlet />
       </main>
     </div>

@@ -22,6 +22,7 @@ export { ShopProductRepository } from './repositories/shop-product.repository';
 export { FulfillmentRepository } from './repositories/fulfillment.repository';
 export { OrderItemRepository } from './repositories/order-item.repository';
 export { OrderEventRepository } from './repositories/order-event.repository';
+export { StatsRepository } from './repositories/stats.repository';
 export { ShopUserRepository } from './repositories/shop-user.repository';
 export { MessageRepository } from './repositories/message.repository';
 
