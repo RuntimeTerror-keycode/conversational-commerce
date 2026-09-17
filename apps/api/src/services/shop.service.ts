@@ -1,4 +1,4 @@
-import { AppError, ShopRepository, ShopSettingsRow } from '@cc/domain';
+import { AppError, ShopRepository, ShopSettingsRow, isWithinOpeningHours } from '@cc/domain';
 import { Logger } from '../logger/logger';
 
 import { ShopSettings, ShopSettingsUpdate } from '../types';
@@ -124,11 +124,10 @@ export class ShopService {
   }
 
   /**
-   * Derived here rather than in each client, so the dashboard and the agent
-   * can never disagree about whether a shop is taking orders.
-   *
-   * Overnight hours are supported: closing before opening (22:00 → 06:00)
-   * means the window wraps past midnight.
+   * Delegates the actual time-window math to packages/domain's
+   * isWithinOpeningHours — the same function RetailerResolveService uses to
+   * actually gate orders — so the dashboard and the real order flow can
+   * never disagree about whether a shop is taking orders.
    */
   public static openState(
     isActive: boolean,
@@ -139,20 +138,6 @@ export class ShopService {
     if (!isActive) return 'offline';
     if (!openingTime || !closingTime) return 'always_open';
 
-    const minutes = now.getHours() * 60 + now.getMinutes();
-    const toMinutes = (value: string): number => {
-      const [h, m] = value.split(':').map(Number);
-      return h * 60 + m;
-    };
-
-    const open = toMinutes(openingTime);
-    const close = toMinutes(closingTime);
-
-    const within =
-      open <= close
-        ? minutes >= open && minutes < close
-        : minutes >= open || minutes < close;
-
-    return within ? 'open' : 'closed';
+    return isWithinOpeningHours(openingTime, closingTime, now) ? 'open' : 'closed';
   }
 }
