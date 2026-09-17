@@ -85,10 +85,11 @@ export class FulfillmentService {
       throw AppError.validation(`Invalid status filter. Must be one of: ${fulfillmentStatuses.join(', ')}`);
     }
 
-    const [rows, total, statusRows] = await Promise.all([
+    const [rows, total, statusRows, revenue] = await Promise.all([
       this.fulfillmentRepo.findByShop({ shopId, status, since, limit, offset }),
       this.fulfillmentRepo.countByShop(shopId, status, since),
       this.fulfillmentRepo.statusCountsByShop(shopId),
+      this.fulfillmentRepo.revenueByShop(shopId),
     ]);
 
     const counts: FulfillmentCounts = {
@@ -114,6 +115,10 @@ export class FulfillmentService {
       })),
       page: { page, limit, total, hasMore: offset + limit < total },
       counts,
+      totals: {
+        deliveredRevenue: parseFloat(revenue.total),
+        deliveredRevenueToday: parseFloat(revenue.today),
+      },
       serverTime: new Date().toISOString(),
     };
   }

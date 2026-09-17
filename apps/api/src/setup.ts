@@ -23,6 +23,7 @@ import {
 import { IdentifyService } from './services/identify.service';
 import { FulfillmentService } from './services/fulfillment.service';
 import { InventoryService } from './services/inventory.service';
+import { ShopService } from './services/shop.service';
 
 // Domain services — from domain
 import {
@@ -53,6 +54,7 @@ import { CartController } from './controllers/cart.controller';
 import { OrderController } from './controllers/order.controller';
 import { WhatsappController } from './controllers/whatsapp.controller';
 import { InventorySyncController } from './controllers/inventory-sync.controller';
+import { ShopController } from './controllers/shop.controller';
 
 // Middlewares
 import { RequestLogger } from './middlewares/request-logger.middleware';
@@ -73,6 +75,7 @@ export interface AppControllers {
   order: OrderController;
   whatsapp: WhatsappController;
   inventorySync: InventorySyncController;
+  shop: ShopController;
 }
 
 export interface AppMiddlewares {
@@ -124,7 +127,8 @@ export class Setup {
     const fulfillmentService = new FulfillmentService(
       fulfillmentRepo, orderItemRepo, orderEventRepo, shopProductRepo, shopRepo, db, notifyService, logger,
     );
-    const inventoryService = new InventoryService(shopProductRepo, logger);
+    const inventoryService = new InventoryService(shopProductRepo, shopRepo, logger);
+    const shopService = new ShopService(shopRepo, logger);
 
     // Agent-facing services (from @cc/domain, take ILogger)
     const retailerService = new RetailerResolveService(customerRepo, shopRepo, logger);
@@ -147,7 +151,7 @@ export class Setup {
 
     // Inventory sync (external POS webhook → RabbitMQ → DB)
     const inventorySyncService = new InventorySyncService(
-      broker, db, categoryRepo, catalogRepo, shopProductRepo, logger,
+      broker, db, categoryRepo, catalogRepo, shopProductRepo, shopRepo, logger,
     );
 
     // WhatsApp orchestration
@@ -175,6 +179,7 @@ export class Setup {
         order: new OrderController(orderPlacementService, orderNotifyService),
         whatsapp: new WhatsappController(whatsappService),
         inventorySync: new InventorySyncController(inventorySyncService),
+        shop: new ShopController(shopService),
       },
       middlewares: {
         cors: new CorsMiddleware(),

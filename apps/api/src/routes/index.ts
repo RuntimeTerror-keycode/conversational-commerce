@@ -10,6 +10,7 @@ import { CartRoute } from './cart.route';
 import { OrderRoute } from './order.route';
 import { WhatsappRoute } from './whatsapp.route';
 import { InventorySyncRoute } from './inventory-sync.route';
+import { ShopRoute } from './shop.route';
 
 export class RouteRegistrar {
   private readonly app: Application;
@@ -33,6 +34,7 @@ export class RouteRegistrar {
     const orderRoute = new OrderRoute(this.controllers.order);
     const whatsappRoute = new WhatsappRoute(this.controllers.whatsapp, this.middlewares.serviceAuth);
     const inventorySyncRoute = new InventorySyncRoute(this.controllers.inventorySync);
+    const shopRoute = new ShopRoute(this.controllers.shop, this.middlewares.shopContext);
 
     this.app.use('/api', healthRoute.router);
     this.app.use('/api', identifyRoute.router);
@@ -44,5 +46,6 @@ export class RouteRegistrar {
     this.app.use('/api', orderRoute.router);
     this.app.use('/api', whatsappRoute.router);
     this.app.use('/api', inventorySyncRoute.router);
+    this.app.use('/api', shopRoute.router);
   }
 }

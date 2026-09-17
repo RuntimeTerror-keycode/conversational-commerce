@@ -22,8 +22,8 @@ export class ShopContextMiddleware {
       throw AppError.badRequest('Invalid X-Shop-Id header — must be a positive integer');
     }
 
-    const result = await this.db.query<{ id: number; is_active: boolean }>(
-      'SELECT id, is_active FROM shop WHERE id = $1',
+    const result = await this.db.query<{ id: number }>(
+      'SELECT id FROM shop WHERE id = $1',
       [shopId],
     );
 
@@ -31,10 +31,11 @@ export class ShopContextMiddleware {
       throw AppError.badRequest('Unknown shop');
     }
 
-    if (!result.rows[0].is_active) {
-      throw AppError.forbidden('Shop is inactive');
-    }
-
+    // `is_active` is deliberately NOT checked here. It means "this shop is
+    // taking customer orders", not "this shop may use its dashboard" — a
+    // shopkeeper who switches the shop offline still has to pack the orders
+    // already in flight, and locking them out of their own portal to do it
+    // would make the offline toggle unusable.
     req.shopId = shopId;
     next();
   };

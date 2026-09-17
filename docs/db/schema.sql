@@ -49,7 +49,11 @@ CREATE TABLE shop (
     closing_time        TIME,
     is_active           BOOLEAN NOT NULL DEFAULT true,
     delivery_radius_km  DECIMAL(5,2),
-    inventory_mode      VARCHAR(20) NOT NULL DEFAULT 'managed',
+    -- 'managed' = the shopkeeper keeps stock here and we decrement it as orders
+    -- are fulfilled. 'synced'  = the shop runs its own POS and pushes a full
+    -- snapshot; our rows are a read-only copy.
+    inventory_mode      VARCHAR(20) NOT NULL DEFAULT 'managed'
+                          CHECK (inventory_mode IN ('managed', 'synced')),
     created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 

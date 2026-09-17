@@ -37,6 +37,23 @@ export const dashboardSettableStatuses: FulfillmentStatus[] = [
 ];
 
 // ---------------------------------------------------------------------------
+// Inventory ownership
+//
+// `managed` — the shopkeeper keeps stock and prices here, and we decrement
+//             counts as orders are fulfilled.
+// `synced`  — the shop runs its own POS/billing system and pushes a full
+//             snapshot to us. Our rows are a copy, so the portal is read-only:
+//             a write here would be overwritten by the next push, and would
+//             disagree with the shop's real stock until then.
+// ---------------------------------------------------------------------------
+
+export const inventoryModes = ['managed', 'synced'] as const;
+export type InventoryMode = typeof inventoryModes[number];
+
+/** The one place that decides whether a shop's stock is ours to write. */
+export const isManagedInventory = (mode: string): boolean => mode === 'managed';
+
+// ---------------------------------------------------------------------------
 // Inventory stock state filters
 // ---------------------------------------------------------------------------
 

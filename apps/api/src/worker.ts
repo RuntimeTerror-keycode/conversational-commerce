@@ -1,4 +1,4 @@
-import { CategoryRepository, CatalogRepository, ShopProductRepository } from '@cc/domain';
+import { CategoryRepository, CatalogRepository, ShopProductRepository, ShopRepository } from '@cc/domain';
 import { Config } from './config/config';
 import { Logger } from './logger/logger';
 import { Database } from './lib/db';
@@ -18,9 +18,10 @@ async function bootstrap(): Promise<void> {
   const categoryRepo = new CategoryRepository(db);
   const catalogRepo = new CatalogRepository(db);
   const shopProductRepo = new ShopProductRepository(db);
+  const shopRepo = new ShopRepository(db);
 
   const syncService = new InventorySyncService(
-    broker, db, categoryRepo, catalogRepo, shopProductRepo, logger,
+    broker, db, categoryRepo, catalogRepo, shopProductRepo, shopRepo, logger,
   );
 
   const consumer = new InventorySyncConsumer(syncService, broker, logger);

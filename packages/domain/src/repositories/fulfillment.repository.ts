@@ -57,6 +57,26 @@ export class FulfillmentRepository {
     return result.rows;
   }
 
+  /**
+   * Money totals across every matching row, not just the current page.
+   *
+   * The dashboard cannot add up a page of orders and call it revenue — the
+   * figure would silently go wrong the moment a shop has more orders than fit
+   * on one page. So the sum happens here, over the whole table.
+   */
+  public async revenueByShop(shopId: number): Promise<{ total: string; today: string }> {
+    const result = await this.db.query<{ total: string; today: string }>(
+      `SELECT
+         COALESCE(SUM(subtotal), 0)::text AS total,
+         COALESCE(SUM(subtotal) FILTER (WHERE delivered_at >= date_trunc('day', NOW())), 0)::text AS today
+       FROM fulfillment
+       WHERE shop_id = $1 AND status = 'delivered'`,
+      [shopId],
+    );
+
+    return result.rows[0];
+  }
+
   public async findById(fulfillmentId: number, shopId: number): Promise<FulfillmentDetailRow | null> {
     const result = await this.db.query<FulfillmentDetailRow>(
       `SELECT
