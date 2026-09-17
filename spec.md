@@ -366,7 +366,15 @@ Suggested domain swap order: `searchProducts` → cart → confirmation/createOr
 
 Documented across the three attached contracts; summarised here:
 
-1. **`/notify` + auto-accept owner** — `apps/api` vs `apps/agent` (prefer API + `transitionOrder`).
+1. ~~**`/notify` + auto-accept owner** — `apps/api` vs `apps/agent` (prefer API + `transitionOrder`).~~
+   **Resolved and implemented (2026-09-17).** `apps/api` owns it. Fires on: order placement
+   (`order_accepted` — fulfillments default to `accepted`, so this is the closest thing to an
+   "accept" event), `PATCH /fulfillments/:id` transitioning to `out_for_delivery`, and
+   `PATCH /fulfillments/:id/items/:lineId` substitutions. `rejected` is defined in
+   `NotifyService`'s reason type but has no caller yet — `dashboardSettableStatuses` still
+   excludes it (see item 3 below, unresolved). Notify failures are logged and swallowed —
+   they never fail the underlying retailer action. See `apps/api/src/services/notify.service.ts`,
+   `order-notify.service.ts`, `lib/edge-notify-client.ts`.
 2. **Auto-accept delay** — keep ~60s or go immediate?
 3. **Is `rejected` reachable?** Keep in enum defensively, or drop from UI?
 4. **Shopkeeper auth** — nothing in repo; cookie session vs demo hardcoded retailer.
@@ -379,5 +387,18 @@ Documented across the three attached contracts; summarised here:
 11. **Payment / delivery vs pickup / cancellation** — barely specified; WhatsApp contract allows `COD` | `GPAY`.
 12. **List envelope** for `GET /api/orders` (pagination + status `counts`) vs bare array in older §C2.
 13. **Reconcile WhatsApp `found`/`choice` tags with `ReplyBlock`** in the edge adapter.
+14. **WhatsApp search/select bypasses `apps/agent` for now (provisional answer to #13, 2026-09-17).**
+    `apps/agent` isn't built yet (no mastra tools, `/agent/turn` doesn't compile), so
+    `apps/edge` calls two new synchronous `apps/api` endpoints directly instead of going
+    through step 2→3 of the build order above: `POST /api/whatsapp/orders/search` and
+    `POST /api/whatsapp/orders/select` (see `apps/Whatsapp contract.md`), auth'd with the
+    same `X-Service-Token`/`SERVICE_SHARED_SECRET` pattern as `/notify`. The response body
+    *is* the `found`/`choice`/`not_found`/`added`/`unavailable` payload — no `/notify` round
+    trip for this flow. The actual search/cart/session logic lives in `packages/domain`
+    (`CatalogSearchService`, `CartService`, `SessionService`); `apps/api`'s
+    `whatsapp.service.ts` is response-shaping only. When `apps/agent` is built, these same
+    `packages/domain` calls should become Mastra tools, and the `found`/`choice` tags should
+    be reconciled with `ReplyBlock` (item 13) in the edge adapter as originally planned —
+    this isn't a replacement for that work, just what unblocks the demo today.
 
 When these are decided, update this file and `docs/contracts.md` in the same PR.

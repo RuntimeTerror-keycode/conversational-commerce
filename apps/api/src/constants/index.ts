@@ -44,6 +44,14 @@ export const stockStateFilters = ['in_stock', 'low', 'out'] as const;
 export type StockStateFilter = typeof stockStateFilters[number];
 
 // ---------------------------------------------------------------------------
+// Inventory sync — external software integrations
+// ---------------------------------------------------------------------------
+
+export const inventorySoftwareNames = ['freshkart', 'storelink'] as const;
+export type InventorySoftwareName = typeof inventorySoftwareNames[number];
+export const inventorySyncQueue = 'inventory.sync';
+
+// ---------------------------------------------------------------------------
 // Pagination defaults
 // ---------------------------------------------------------------------------
 

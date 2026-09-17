@@ -16,6 +16,14 @@ export class CustomerRepository {
     return result.rows[0] ?? null;
   }
 
+  public async findById(customerId: number): Promise<CustomerRow | null> {
+    const result = await this.db.query<CustomerRow>(
+      'SELECT id, phone, display_name, language FROM customer WHERE id = $1',
+      [customerId],
+    );
+    return result.rows[0] ?? null;
+  }
+
   public async findWithDefaultAddress(phone: string): Promise<CustomerWithAddressRow | null> {
     const result = await this.db.query<CustomerWithAddressRow>(
       `SELECT
@@ -33,5 +41,48 @@ export class CustomerRepository {
       [phone],
     );
     return result.rows[0] ?? null;
+  }
+
+  public async findOrCreateByPhone(phone: string): Promise<CustomerRow> {
+    const result = await this.db.query<CustomerRow>(
+      `INSERT INTO customer (phone) VALUES ($1)
+       ON CONFLICT (phone) DO UPDATE SET phone = EXCLUDED.phone
+       RETURNING id, phone, display_name, language`,
+      [phone],
+    );
+    return result.rows[0];
+  }
+
+  /** Upserts the customer's default address, used for WhatsApp session tracking. Returns the address id. */
+  public async upsertDefaultAddress(
+    customerId: number,
+    input: { addressLine?: string; latitude: number; longitude: number },
+  ): Promise<number> {
+    const existing = await this.db.query<{ address_id: number }>(
+      `SELECT a.id AS address_id
+       FROM customer_address ca
+       JOIN address a ON a.id = ca.address_id
+       WHERE ca.customer_id = $1 AND ca.is_default = true`,
+      [customerId],
+    );
+
+    if (existing.rows[0]) {
+      await this.db.query(
+        `UPDATE address SET address_line = $2, latitude = $3, longitude = $4 WHERE id = $1`,
+        [existing.rows[0].address_id, input.addressLine ?? null, input.latitude, input.longitude],
+      );
+      return existing.rows[0].address_id;
+    }
+
+    const created = await this.db.query<{ id: number }>(
+      `INSERT INTO address (address_line, latitude, longitude) VALUES ($1, $2, $3) RETURNING id`,
+      [input.addressLine ?? null, input.latitude, input.longitude],
+    );
+    await this.db.query(
+      `INSERT INTO customer_address (customer_id, address_id, address_type, is_default)
+       VALUES ($1, $2, 'home', true)`,
+      [customerId, created.rows[0].id],
+    );
+    return created.rows[0].id;
   }
 }

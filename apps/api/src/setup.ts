@@ -12,9 +12,11 @@ import {
   ShopProductRepository,
   CustomerRepository,
   ShopRepository,
+  CategoryRepository,
   CatalogRepository,
   CartRepository,
   MasterOrderRepository,
+  MessageRepository,
 } from '@cc/domain';
 
 // Dashboard services — stay in apps/api
@@ -28,7 +30,17 @@ import {
   CatalogSearchService,
   CartService,
   OrderPlacementService,
+  SessionService,
 } from '@cc/domain';
+
+// Orchestration — stays in apps/api (schema/routing only, calls @cc/domain)
+import { WhatsappService } from './services/whatsapp.service';
+import { CatalogOrchestrationService } from './services/catalog-orchestration.service';
+import { CartOrchestrationService } from './services/cart-orchestration.service';
+import { EdgeNotifyClient } from './lib/edge-notify-client';
+import { NotifyService } from './services/notify.service';
+import { OrderNotifyService } from './services/order-notify.service';
+import { InventorySyncService } from './services/inventory-sync.service';
 
 // Controllers
 import { HealthController } from './controllers/health.controller';
@@ -39,11 +51,14 @@ import { RetailerController } from './controllers/retailer.controller';
 import { CatalogController } from './controllers/catalog.controller';
 import { CartController } from './controllers/cart.controller';
 import { OrderController } from './controllers/order.controller';
+import { WhatsappController } from './controllers/whatsapp.controller';
+import { InventorySyncController } from './controllers/inventory-sync.controller';
 
 // Middlewares
 import { RequestLogger } from './middlewares/request-logger.middleware';
 import { CorsMiddleware } from './middlewares/cors.middleware';
 import { ShopContextMiddleware } from './middlewares/shop-context.middleware';
+import { ServiceAuthMiddleware } from './middlewares/service-auth.middleware';
 import { NotFoundHandler } from './middlewares/not-found.middleware';
 import { ErrorHandler } from './middlewares/error-handler.middleware';
 
@@ -56,12 +71,15 @@ export interface AppControllers {
   catalog: CatalogController;
   cart: CartController;
   order: OrderController;
+  whatsapp: WhatsappController;
+  inventorySync: InventorySyncController;
 }
 
 export interface AppMiddlewares {
   cors: CorsMiddleware;
   requestLogger: RequestLogger;
   shopContext: ShopContextMiddleware;
+  serviceAuth: ServiceAuthMiddleware;
   notFound: NotFoundHandler;
   error: ErrorHandler;
 }
@@ -90,22 +108,29 @@ export class Setup {
     const shopProductRepo = new ShopProductRepository(db);
     const customerRepo = new CustomerRepository(db);
     const shopRepo = new ShopRepository(db);
+    const categoryRepo = new CategoryRepository(db);
     const catalogRepo = new CatalogRepository(db);
     const cartRepo = new CartRepository(db);
     const masterOrderRepo = new MasterOrderRepository(db);
+    const messageRepo = new MessageRepository(db);
+
+    // Notify (apps/api -> apps/edge POST /notify, docs/contracts.md §A2)
+    const edgeNotifyClient = new EdgeNotifyClient(config, logger);
+    const notifyService = new NotifyService(edgeNotifyClient);
+    const orderNotifyService = new OrderNotifyService(masterOrderRepo, customerRepo, notifyService, logger);
 
     // Dashboard services
     const identifyService = new IdentifyService(shopUserRepo, logger);
     const fulfillmentService = new FulfillmentService(
-      fulfillmentRepo, orderItemRepo, orderEventRepo, shopProductRepo, db, logger,
+      fulfillmentRepo, orderItemRepo, orderEventRepo, shopProductRepo, shopRepo, db, notifyService, logger,
     );
     const inventoryService = new InventoryService(shopProductRepo, logger);
 
     // Agent-facing services (from @cc/domain, take ILogger)
     const retailerService = new RetailerResolveService(customerRepo, shopRepo, logger);
-    const catalogService = new CatalogSearchService(catalogRepo, retailerService, logger);
+    const catalogService = new CatalogSearchService(catalogRepo, logger);
     const cartService = new CartService(
-      cartRepo, catalogRepo, customerRepo, shopProductRepo, retailerService, logger,
+      cartRepo, catalogRepo, customerRepo, shopProductRepo, logger,
     );
     const orderPlacementService = new OrderPlacementService({
       cartRepo,
@@ -118,6 +143,21 @@ export class Setup {
       db,
       logger,
     });
+    const sessionService = new SessionService(customerRepo, masterOrderRepo, messageRepo, logger);
+
+    // Inventory sync (external POS webhook → RabbitMQ → DB)
+    const inventorySyncService = new InventorySyncService(
+      broker, db, categoryRepo, catalogRepo, shopProductRepo, logger,
+    );
+
+    // WhatsApp orchestration
+    const whatsappService = new WhatsappService(
+      sessionService, retailerService, catalogService, cartService, logger,
+    );
+
+    // Customer-facing catalog/cart orchestration (resolves retailerId from customerId)
+    const catalogOrchestrationService = new CatalogOrchestrationService(catalogService, retailerService);
+    const cartOrchestrationService = new CartOrchestrationService(cartService, retailerService);
 
     return {
       config,
@@ -130,14 +170,17 @@ export class Setup {
         fulfillment: new FulfillmentController(fulfillmentService),
         inventory: new InventoryController(inventoryService),
         retailer: new RetailerController(retailerService),
-        catalog: new CatalogController(catalogService),
-        cart: new CartController(cartService),
-        order: new OrderController(orderPlacementService),
+        catalog: new CatalogController(catalogOrchestrationService),
+        cart: new CartController(cartOrchestrationService),
+        order: new OrderController(orderPlacementService, orderNotifyService),
+        whatsapp: new WhatsappController(whatsappService),
+        inventorySync: new InventorySyncController(inventorySyncService),
       },
       middlewares: {
         cors: new CorsMiddleware(),
         requestLogger: new RequestLogger(logger),
         shopContext: new ShopContextMiddleware(db, logger),
+        serviceAuth: new ServiceAuthMiddleware(config),
         notFound: new NotFoundHandler(logger),
         error: new ErrorHandler(config, logger),
       },

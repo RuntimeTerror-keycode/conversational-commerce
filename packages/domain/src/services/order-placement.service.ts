@@ -20,6 +20,7 @@ import { MasterOrderRepository } from '../repositories/master-order.repository';
 import { OrderEventRepository } from '../repositories/order-event.repository';
 import { OrderItemRepository } from '../repositories/order-item.repository';
 import { ShopRepository } from '../repositories/shop.repository';
+import { generateOrderCode } from '../lib/order-code';
 import {
   confirmationTokenTtlMinutes,
   defaultEtaMinutes,
@@ -91,7 +92,6 @@ export class OrderPlacementService {
     const customerAddress = await this.customerRepo.findWithDefaultAddress(customerId);
     const addressId = customerAddress?.address_id ?? 0;
 
-    const orderCode = this.generateOrderCode();
     const cartHash = this.computeCartHash(cartItems);
 
     const snapshot: ConfirmedSnapshot = {
@@ -104,9 +104,7 @@ export class OrderPlacementService {
       nearbyShopIds: shopIds,
     };
 
-    await this.masterOrderRepo.createDraft({
-      orderCode,
-      customerId: customer.id,
+    const confirmationFields = {
       addressId,
       productAmount: totalAmount,
       totalAmount,
@@ -114,7 +112,19 @@ export class OrderPlacementService {
       tokenExpiresAt: expiresAt,
       confirmedSnapshot: snapshot,
       cartHash,
-    });
+    };
+
+    // Reuse an already-open WhatsApp session draft for this customer (see
+    // SessionService.ensureSession) instead of inserting a second
+    // master_order row — the two orderId concepts must stay the same row.
+    const existingDraft = await this.masterOrderRepo.findOpenSessionDraft(customer.id);
+    const orderCode = existingDraft ? existingDraft.order_code : generateOrderCode();
+
+    if (existingDraft) {
+      await this.masterOrderRepo.attachConfirmation(existingDraft.id, confirmationFields);
+    } else {
+      await this.masterOrderRepo.createDraft({ orderCode, customerId: customer.id, ...confirmationFields });
+    }
 
     const summary = this.buildSummaryLines(assignments);
     const shopBreakdown = this.buildBreakdown(assignments);
@@ -199,9 +209,10 @@ export class OrderPlacementService {
       await this.cartRepo.clearCartTx(client, cartId);
     });
 
-    // TODO: POST /notify to edge service — notify customer that order is placed.
-    // Deferred — see docs/agent-domain-contract.md open question 3.
-    // apps/api owns this call (from inside transitionOrder), not the AI service.
+    // The /notify call to apps/edge (reason: order_accepted) is NOT made here —
+    // packages/domain stays free of HTTP/channel concerns. apps/api's
+    // OrderController triggers it after createOrder returns, via
+    // apps/api/src/services/order-notify.service.ts.
 
     this.logger.info('Order placed', {
       orderId: order.id,
@@ -399,11 +410,5 @@ export class OrderPlacementService {
       })),
       subtotal: Math.round(a.subtotal * 100) / 100,
     }));
-  }
-
-  private generateOrderCode(): string {
-    const ts = Date.now().toString(36).toUpperCase();
-    const rand = randomBytes(2).toString('hex').toUpperCase();
-    return `ORD-${ts}-${rand}`;
   }
 }
