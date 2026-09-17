@@ -5,6 +5,7 @@ export interface AppConfig {
   databaseUrl: string;
   rabbitmqUrl: string;
   serviceSharedSecret: string;
+  edgeBaseUrl: string;
 }
 
 export class Config {
@@ -19,6 +20,7 @@ export class Config {
       databaseUrl: this.getEnv('DATABASE_URL', 'postgresql://kadakaran:kadakaran@localhost:5432/kadakaran'),
       rabbitmqUrl: this.getEnv('RABBITMQ_URL', 'amqp://kadakaran:kadakaran@localhost:5672'),
       serviceSharedSecret: this.getEnv('SERVICE_SHARED_SECRET', 'change-me'),
+      edgeBaseUrl: this.getEnv('EDGE_BASE_URL', 'http://localhost:8000'),
     };
 
     this.validate();

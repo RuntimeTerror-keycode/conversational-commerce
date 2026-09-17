@@ -44,12 +44,12 @@ export class OrderItemRepository {
     return result.rows[0].quantity;
   }
 
-  public async delete(lineId: number): Promise<void> {
-    await this.db.query('DELETE FROM order_item WHERE id = $1', [lineId]);
+  public async delete(client: PoolClient, lineId: number): Promise<void> {
+    await client.query('DELETE FROM order_item WHERE id = $1', [lineId]);
   }
 
-  public async substitute(lineId: number, productId: number, unitPrice: number, totalPrice: number): Promise<void> {
-    await this.db.query(
+  public async substitute(client: PoolClient, lineId: number, productId: number, unitPrice: number, totalPrice: number): Promise<void> {
+    await client.query(
       `UPDATE order_item
        SET shop_product_id = $1, unit_price = $2, total_price = $3
        WHERE id = $4`,
@@ -77,8 +77,8 @@ export class OrderItemRepository {
     );
   }
 
-  public async updateQuantity(lineId: number, quantity: number, totalPrice: number): Promise<void> {
-    await this.db.query(
+  public async updateQuantity(client: PoolClient, lineId: number, quantity: number, totalPrice: number): Promise<void> {
+    await client.query(
       'UPDATE order_item SET quantity = $1, total_price = $2 WHERE id = $3',
       [quantity, totalPrice, lineId],
     );

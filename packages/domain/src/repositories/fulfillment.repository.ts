@@ -106,8 +106,8 @@ export class FulfillmentRepository {
     return result.rows[0].id;
   }
 
-  public async recalcSubtotal(fulfillmentId: number): Promise<void> {
-    await this.db.query(
+  public async recalcSubtotal(client: PoolClient, fulfillmentId: number): Promise<void> {
+    await client.query(
       `UPDATE fulfillment
        SET subtotal = COALESCE((SELECT sum(total_price) FROM order_item WHERE fulfillment_id = $1), 0),
            updated_at = NOW()

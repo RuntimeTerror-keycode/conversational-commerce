@@ -366,7 +366,15 @@ Suggested domain swap order: `searchProducts` → cart → confirmation/createOr
 
 Documented across the three attached contracts; summarised here:
 
-1. **`/notify` + auto-accept owner** — `apps/api` vs `apps/agent` (prefer API + `transitionOrder`).
+1. ~~**`/notify` + auto-accept owner** — `apps/api` vs `apps/agent` (prefer API + `transitionOrder`).~~
+   **Resolved and implemented (2026-09-17).** `apps/api` owns it. Fires on: order placement
+   (`order_accepted` — fulfillments default to `accepted`, so this is the closest thing to an
+   "accept" event), `PATCH /fulfillments/:id` transitioning to `out_for_delivery`, and
+   `PATCH /fulfillments/:id/items/:lineId` substitutions. `rejected` is defined in
+   `NotifyService`'s reason type but has no caller yet — `dashboardSettableStatuses` still
+   excludes it (see item 3 below, unresolved). Notify failures are logged and swallowed —
+   they never fail the underlying retailer action. See `apps/api/src/services/notify.service.ts`,
+   `order-notify.service.ts`, `lib/edge-notify-client.ts`.
 2. **Auto-accept delay** — keep ~60s or go immediate?
 3. **Is `rejected` reachable?** Keep in enum defensively, or drop from UI?
 4. **Shopkeeper auth** — nothing in repo; cookie session vs demo hardcoded retailer.

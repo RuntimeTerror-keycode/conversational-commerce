@@ -36,6 +36,9 @@ import {
 import { WhatsappService } from './services/whatsapp.service';
 import { CatalogOrchestrationService } from './services/catalog-orchestration.service';
 import { CartOrchestrationService } from './services/cart-orchestration.service';
+import { EdgeNotifyClient } from './lib/edge-notify-client';
+import { NotifyService } from './services/notify.service';
+import { OrderNotifyService } from './services/order-notify.service';
 
 // Controllers
 import { HealthController } from './controllers/health.controller';
@@ -106,10 +109,15 @@ export class Setup {
     const masterOrderRepo = new MasterOrderRepository(db);
     const messageRepo = new MessageRepository(db);
 
+    // Notify (apps/api -> apps/edge POST /notify, docs/contracts.md §A2)
+    const edgeNotifyClient = new EdgeNotifyClient(config, logger);
+    const notifyService = new NotifyService(edgeNotifyClient);
+    const orderNotifyService = new OrderNotifyService(masterOrderRepo, customerRepo, notifyService, logger);
+
     // Dashboard services
     const identifyService = new IdentifyService(shopUserRepo, logger);
     const fulfillmentService = new FulfillmentService(
-      fulfillmentRepo, orderItemRepo, orderEventRepo, shopProductRepo, db, logger,
+      fulfillmentRepo, orderItemRepo, orderEventRepo, shopProductRepo, shopRepo, db, notifyService, logger,
     );
     const inventoryService = new InventoryService(shopProductRepo, logger);
 
@@ -154,7 +162,7 @@ export class Setup {
         retailer: new RetailerController(retailerService),
         catalog: new CatalogController(catalogOrchestrationService),
         cart: new CartController(cartOrchestrationService),
-        order: new OrderController(orderPlacementService),
+        order: new OrderController(orderPlacementService, orderNotifyService),
         whatsapp: new WhatsappController(whatsappService),
       },
       middlewares: {

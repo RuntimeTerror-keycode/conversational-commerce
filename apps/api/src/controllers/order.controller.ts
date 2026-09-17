@@ -1,12 +1,15 @@
 import { Request, Response } from 'express';
 
 import { OrderPlacementService } from '@cc/domain';
+import { OrderNotifyService } from '../services/order-notify.service';
 
 export class OrderController {
   private readonly service: OrderPlacementService;
+  private readonly orderNotifyService: OrderNotifyService;
 
-  constructor(service: OrderPlacementService) {
+  constructor(service: OrderPlacementService, orderNotifyService: OrderNotifyService) {
     this.service = service;
+    this.orderNotifyService = orderNotifyService;
   }
 
   /** POST /api/orders/confirm */
@@ -49,6 +52,7 @@ export class OrderController {
       return;
     }
 
+    await this.orderNotifyService.notifyOrderAccepted(result.orderId, result.etaMinutes);
     res.status(201).json(result);
   };
 }

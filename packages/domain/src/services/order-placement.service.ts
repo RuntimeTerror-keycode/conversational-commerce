@@ -209,9 +209,10 @@ export class OrderPlacementService {
       await this.cartRepo.clearCartTx(client, cartId);
     });
 
-    // TODO: POST /notify to edge service — notify customer that order is placed.
-    // Deferred — see docs/agent-domain-contract.md open question 3.
-    // apps/api owns this call (from inside transitionOrder), not the AI service.
+    // The /notify call to apps/edge (reason: order_accepted) is NOT made here —
+    // packages/domain stays free of HTTP/channel concerns. apps/api's
+    // OrderController triggers it after createOrder returns, via
+    // apps/api/src/services/order-notify.service.ts.
 
     this.logger.info('Order placed', {
       orderId: order.id,

@@ -16,6 +16,14 @@ export class CustomerRepository {
     return result.rows[0] ?? null;
   }
 
+  public async findById(customerId: number): Promise<CustomerRow | null> {
+    const result = await this.db.query<CustomerRow>(
+      'SELECT id, phone, display_name, language FROM customer WHERE id = $1',
+      [customerId],
+    );
+    return result.rows[0] ?? null;
+  }
+
   public async findWithDefaultAddress(phone: string): Promise<CustomerWithAddressRow | null> {
     const result = await this.db.query<CustomerWithAddressRow>(
       `SELECT
