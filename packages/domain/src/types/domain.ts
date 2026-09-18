@@ -11,7 +11,12 @@ export interface NearbyShop {
 export interface ResolveRetailerResponse {
   primary: { retailerId: string; name: string; area: string };
   nearby: NearbyShop[];
-  hasAddress: boolean;
+  /** Formatted delivery address text, or null if nothing usable is on file yet. */
+  deliveryAddress: string | null;
+  /** The customer's saved payment preference ('cod' | 'gpay'), or null if never set. */
+  paymentMode: string | null;
+  /** True only once a real WhatsApp location share has set real coordinates — a typed address never does. */
+  hasLocation: boolean;
 }
 
 // ---------------------------------------------------------------------------

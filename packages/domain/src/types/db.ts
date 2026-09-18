@@ -106,6 +106,7 @@ export interface MasterOrderRow {
   delivery_note: string | null;
   product_amount: string;
   total_amount: string;
+  delivery_fee: string;
   confirmation_token: string | null;
   token_expires_at: Date | null;
   confirmed_snapshot: ConfirmedSnapshot | null;
