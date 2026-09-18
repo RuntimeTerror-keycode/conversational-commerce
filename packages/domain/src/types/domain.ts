@@ -11,7 +11,12 @@ export interface NearbyShop {
 export interface ResolveRetailerResponse {
   primary: { retailerId: string; name: string; area: string };
   nearby: NearbyShop[];
-  hasAddress: boolean;
+  /** Formatted delivery address text, or null if nothing usable is on file yet. */
+  deliveryAddress: string | null;
+  /** The customer's saved payment preference ('cod' | 'gpay'), or null if never set. */
+  paymentMode: string | null;
+  /** True only once a real WhatsApp location share has set real coordinates — a typed address never does. */
+  hasLocation: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -89,6 +94,8 @@ export interface OrderConfirmationResponse {
   shopBreakdown: ShopBreakdownEntry[];
   deliveryAddress: string | null;
   paymentMode: string | null;
+  /** 0 when one store covers everything. > 0 only when a split across stores was unavoidable — already added into `total`. */
+  deliveryFee: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -131,4 +138,5 @@ export interface SnapshotAssignment {
 export interface ConfirmedSnapshot {
   assignments: SnapshotAssignment[];
   nearbyShopIds: number[];
+  deliveryFee: number;
 }

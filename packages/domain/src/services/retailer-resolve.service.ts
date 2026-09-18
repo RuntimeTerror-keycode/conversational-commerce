@@ -62,8 +62,19 @@ export class RetailerResolveService {
         area: primaryShop.city ?? 'Unknown',
       },
       nearby,
-      hasAddress: customer.address_id !== null,
+      deliveryAddress: this.formatAddress(customer),
+      paymentMode: customer.default_payment_mode,
+      hasLocation: customer.latitude !== null && customer.longitude !== null,
     };
+  }
+
+  private formatAddress(
+    address: { label: string | null; address_line: string | null; city: string | null },
+  ): string | null {
+    const parts = [address.label, address.address_line, address.city].filter(
+      (part): part is string => Boolean(part && part.trim()),
+    );
+    return parts.length > 0 ? parts.join(', ') : null;
   }
 
   public async resolveNearbyShopIds(customerPhone: string): Promise<number[]> {

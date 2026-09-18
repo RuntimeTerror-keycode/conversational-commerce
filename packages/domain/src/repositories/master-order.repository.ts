@@ -17,7 +17,7 @@ export class MasterOrderRepository {
          confirmation_token, token_expires_at,
          confirmed_snapshot, cart_hash,
          delivery_note, trace_id)
-      VALUES ($1, $2, $3, 'draft', $4, $5, $6, 0, 0, $7, $8, $9, $10, $11, $12)
+      VALUES ($1, $2, $3, 'draft', $4, $5, $6, $7, 0, $8, $9, $10, $11, $12, $13)
       RETURNING *`,
       [
         input.orderCode,
@@ -26,6 +26,7 @@ export class MasterOrderRepository {
         input.paymentMode,
         input.productAmount,
         input.totalAmount,
+        input.deliveryFee,
         input.confirmationToken,
         input.tokenExpiresAt,
         JSON.stringify(input.confirmedSnapshot),
@@ -128,12 +129,13 @@ export class MasterOrderRepository {
         payment_mode = $3,
         product_amount = $4,
         total_amount = $5,
-        confirmation_token = $6,
-        token_expires_at = $7,
-        confirmed_snapshot = $8,
-        cart_hash = $9,
-        delivery_note = $10,
-        trace_id = $11,
+        delivery_fee = $6,
+        confirmation_token = $7,
+        token_expires_at = $8,
+        confirmed_snapshot = $9,
+        cart_hash = $10,
+        delivery_note = $11,
+        trace_id = $12,
         updated_at = NOW()
       WHERE id = $1
       RETURNING *`,
@@ -143,6 +145,7 @@ export class MasterOrderRepository {
         input.paymentMode,
         input.productAmount,
         input.totalAmount,
+        input.deliveryFee,
         input.confirmationToken,
         input.tokenExpiresAt,
         JSON.stringify(input.confirmedSnapshot),

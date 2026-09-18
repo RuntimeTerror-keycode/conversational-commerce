@@ -26,8 +26,17 @@ export class CartService {
     this.logger = logger.child('CartService');
   }
 
-  /** retailerId is the scoping boundary — cart pricing is always against a single shop. */
-  public async getCart(retailerId: string, customerId: string): Promise<DomainCart> {
+  /**
+   * retailerId is the scoping boundary and stays the first argument per
+   * convention, but pricing/availability is checked against the full
+   * nearbyShopIds set (falling back to just retailerId when the caller has
+   * none) — a customer's cart can contain items that only the SECOND- or
+   * THIRD-nearest shop stocks; that's exactly the case the best-value
+   * multi-store split at checkout exists to handle, and it can only ever be
+   * reached if adding such an item to the cart in the first place isn't
+   * rejected as "not available at this shop".
+   */
+  public async getCart(retailerId: string, customerId: string, nearbyShopIds: string[] = []): Promise<DomainCart> {
     const shopId = parseInt(retailerId, 10);
     if (isNaN(shopId)) {
       throw AppError.validation('retailerId must be a valid number');
@@ -41,7 +50,8 @@ export class CartService {
     const cartId = await this.cartRepo.findOrCreate(customer.id);
     const items = await this.cartRepo.findItems(cartId);
 
-    const lines = await this.buildCartLines(items, [shopId]);
+    const shopIds = nearbyShopIds.length > 0 ? nearbyShopIds.map((id) => parseInt(id, 10)) : [shopId];
+    const lines = await this.buildCartLines(items, shopIds);
     const total = lines.reduce((sum, line) => sum + line.price * line.quantity, 0);
 
     return {
@@ -52,7 +62,12 @@ export class CartService {
     };
   }
 
-  public async mutateCart(retailerId: string, customerId: string, op: CartOpInput): Promise<DomainCart> {
+  public async mutateCart(
+    retailerId: string,
+    customerId: string,
+    op: CartOpInput,
+    nearbyShopIds: string[] = [],
+  ): Promise<DomainCart> {
     const shopId = parseInt(retailerId, 10);
     if (isNaN(shopId)) {
       throw AppError.validation('retailerId must be a valid number');
@@ -73,6 +88,7 @@ export class CartService {
       throw AppError.validation(`Unknown product: ${op.productId}`);
     }
 
+    const shopIds = nearbyShopIds.length > 0 ? nearbyShopIds.map((id) => parseInt(id, 10)) : [shopId];
     const cartId = await this.cartRepo.findOrCreate(customer.id);
 
     switch (op.action) {
@@ -80,7 +96,7 @@ export class CartService {
         if (op.quantity <= 0) {
           throw AppError.validation('quantity must be positive for add');
         }
-        const available = await this.catalogRepo.isAvailableAtAnyShop(catalogId, [shopId]);
+        const available = await this.catalogRepo.isAvailableAtAnyShop(catalogId, shopIds);
         if (!available) {
           throw AppError.validation('Product is not available at this shop');
         }
@@ -123,7 +139,7 @@ export class CartService {
       quantity: op.quantity,
     });
 
-    return this.getCart(retailerId, customerId);
+    return this.getCart(retailerId, customerId, nearbyShopIds);
   }
 
   private async buildCartLines(

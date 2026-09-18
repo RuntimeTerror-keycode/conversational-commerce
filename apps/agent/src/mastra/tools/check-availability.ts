@@ -25,9 +25,9 @@ export const checkAvailability = createTool({
     z.object({ error: z.literal(true), reason: z.string() }),
   ]),
   execute: async ({ productIds }, context) => {
-    const { retailerId } = readShoppingContext(context.requestContext);
+    const { retailerId, nearbyShopIds } = readShoppingContext(context.requestContext);
     return asValue(async () => {
-      const results = await getServices().catalog.checkAvailability(retailerId, productIds);
+      const results = await getServices().catalog.checkAvailability(retailerId, productIds, nearbyShopIds);
       return { results };
     });
   },

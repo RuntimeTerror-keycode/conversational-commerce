@@ -33,13 +33,18 @@ export const searchList = createTool({
     ),
   }),
   execute: async ({ queries, limitPerQuery }, context) => {
-    const { retailerId } = readShoppingContext(context.requestContext);
+    const { retailerId, nearbyShopIds } = readShoppingContext(context.requestContext);
     const catalog = getServices().catalog;
 
     const results = await Promise.all(
       queries.map(async (query) => {
         try {
-          const products = await catalog.searchProducts(retailerId, query, { limit: limitPerQuery ?? 2 });
+          const products = await catalog.searchProducts(
+            retailerId,
+            query,
+            { limit: limitPerQuery ?? 2 },
+            nearbyShopIds,
+          );
           return { query, products };
         } catch {
           return { query, products: [] };

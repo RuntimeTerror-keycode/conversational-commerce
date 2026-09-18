@@ -21,30 +21,34 @@ export class CatalogRepository {
     const shopParam = `$${queryTokens.length + 1}`;
     const limitParam = `$${queryTokens.length + 2}`;
 
-    const tokenMatchClause = tokenParams
-      .map((p) => `t.tag ILIKE '%' || ${p} || '%'`)
-      .join(' OR ');
+    // Summed per-token match counts, not a flat "did anything match" score —
+    // a single coincidental tag substring hit (e.g. "white" inside an
+    // unrelated "white rice" tag) must never outrank a product whose name
+    // matches nearly every token in the query. Tag hits stay weighted above
+    // name hits per token, just no longer flattened to one bit.
+    const tagScoreExpr = tokenParams
+      .map((p) => `CASE WHEN bool_or(tag ILIKE '%' || ${p} || '%') THEN 1 ELSE 0 END`)
+      .join(' + ');
 
-    const nameMatchClause = tokenParams
-      .map((p) => `c.name ILIKE '%' || ${p} || '%'`)
-      .join(' OR ');
+    const nameScoreExpr = tokenParams
+      .map((p) => `CASE WHEN name ILIKE '%' || ${p} || '%' THEN 1 ELSE 0 END`)
+      .join(' + ');
 
     const sql = `
-      WITH tag_matches AS (
-        SELECT DISTINCT t.catalog_id, 2 AS score
-        FROM tag t
-        WHERE ${tokenMatchClause}
+      WITH tag_scores AS (
+        SELECT catalog_id, (${tagScoreExpr}) AS score
+        FROM tag
+        GROUP BY catalog_id
       ),
-      name_matches AS (
-        SELECT DISTINCT c.id AS catalog_id, 1 AS score
-        FROM catalog c
-        WHERE ${nameMatchClause}
+      name_scores AS (
+        SELECT id AS catalog_id, (${nameScoreExpr}) AS score
+        FROM catalog
       ),
       all_matches AS (
-        SELECT catalog_id, MAX(score) AS score FROM (
-          SELECT catalog_id, score FROM tag_matches
+        SELECT catalog_id, SUM(score) AS score FROM (
+          SELECT catalog_id, score * 2 AS score FROM tag_scores WHERE score > 0
           UNION ALL
-          SELECT catalog_id, score FROM name_matches
+          SELECT catalog_id, score FROM name_scores WHERE score > 0
         ) combined
         GROUP BY catalog_id
       )
@@ -73,9 +77,9 @@ export class CatalogRepository {
 
   public async checkAvailabilityAtShop(
     catalogIds: number[],
-    shopId: number,
+    shopIds: number[],
   ): Promise<{ catalog_id: number; is_available: boolean; stock_quantity: number; selling_price: number }[]> {
-    if (catalogIds.length === 0) return [];
+    if (catalogIds.length === 0 || shopIds.length === 0) return [];
 
     const result = await this.db.query<{
       catalog_id: number;
@@ -85,34 +89,38 @@ export class CatalogRepository {
     }>(
       `SELECT
         sp.catalog_id,
-        sp.is_available,
-        sp.stock_quantity,
-        sp.selling_price::float AS selling_price
+        bool_or(sp.is_available AND sp.stock_quantity > 0) AS is_available,
+        SUM(sp.stock_quantity) AS stock_quantity,
+        MIN(sp.selling_price)::float AS selling_price
       FROM shop_product sp
-      WHERE sp.catalog_id = ANY($1::int[]) AND sp.shop_id = $2`,
-      [catalogIds, shopId],
+      WHERE sp.catalog_id = ANY($1::int[]) AND sp.shop_id = ANY($2::int[])
+      GROUP BY sp.catalog_id`,
+      [catalogIds, shopIds],
     );
     return result.rows;
   }
 
   public async findSubstitutes(
     catalogId: number,
-    shopId: number,
+    shopIds: number[],
     limit: number,
   ): Promise<SubstituteRow[]> {
+    if (shopIds.length === 0) return [];
+
     const result = await this.db.query<SubstituteRow>(
       `SELECT
         c.id AS catalog_id, c.name, c.unit,
-        sp.selling_price::float AS price
+        MIN(sp.selling_price)::float AS price
       FROM catalog c
-      JOIN shop_product sp ON sp.catalog_id = c.id AND sp.shop_id = $2
+      JOIN shop_product sp ON sp.catalog_id = c.id AND sp.shop_id = ANY($2::int[])
       WHERE c.category_id = (SELECT category_id FROM catalog WHERE id = $1)
         AND c.id != $1
         AND sp.is_available = true
         AND sp.stock_quantity > 0
-      ORDER BY sp.selling_price ASC
+      GROUP BY c.id, c.name, c.unit
+      ORDER BY price ASC
       LIMIT $3`,
-      [catalogId, shopId, limit],
+      [catalogId, shopIds, limit],
     );
     return result.rows;
   }

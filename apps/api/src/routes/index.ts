@@ -32,7 +32,7 @@ export class RouteRegistrar {
     const retailerRoute = new RetailerRoute(this.controllers.retailer);
     const catalogRoute = new CatalogRoute(this.controllers.catalog);
     const cartRoute = new CartRoute(this.controllers.cart);
-    const orderRoute = new OrderRoute(this.controllers.order);
+    const orderRoute = new OrderRoute(this.controllers.order, this.middlewares.serviceAuth);
     const whatsappRoute = new WhatsappRoute(this.controllers.whatsapp, this.middlewares.serviceAuth);
     const inventorySyncRoute = new InventorySyncRoute(this.controllers.inventorySync);
     const shopRoute = new ShopRoute(this.controllers.shop, this.middlewares.shopContext);

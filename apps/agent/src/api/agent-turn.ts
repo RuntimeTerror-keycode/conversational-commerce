@@ -112,6 +112,43 @@ function shopClosedMessage(nextOpeningTime: string | null): string {
   ].join("\n");
 }
 
+/** First-ever contact, no address on file at all yet. */
+function addressOnboardingMessage(): string {
+  return [
+    "📍 *Delivery Address Needed*",
+    "To get started, please share your delivery address — flat/house, street, area.",
+    "",
+    "📎 Or share your live location (Location → Send current location) for more accurate delivery.",
+    "",
+    "Go ahead and tell me what you'd like to order once that's set! 😊",
+  ].join("\n");
+}
+
+function paymentModeLabel(mode: string): string {
+  return mode === "gpay" ? "GPay/UPI" : "Cash on Delivery";
+}
+
+/**
+ * A returning customer, at the start of a new order — asked once per
+ * session, not every message, so a saved address or payment preference
+ * never silently carries over into every future order for good the way a
+ * pure "ask once, ever" flow would.
+ */
+function confirmOrderDetailsMessage(address: string, paymentMode: string | null): string {
+  return [
+    "📍 *Confirm Order Details*",
+    `Delivering to: *${address}*`,
+    paymentMode ? `Payment: *${paymentModeLabel(paymentMode)}* (last used)` : null,
+    "",
+    "Reply *yes* if these are still right, or update either — share a new location for the address, " +
+      "or just say \"cash\" or \"GPay\" to change the payment method.",
+    "",
+    "Once confirmed, go ahead and tell me what you'd like to order! 😊",
+  ]
+    .filter((line): line is string => line !== null)
+    .join("\n");
+}
+
 export async function agentTurn(req: Request, res: Response) {
   const parsed = AgentTurnRequest.safeParse(req.body);
   if (!parsed.success) {
@@ -186,8 +223,30 @@ export async function agentTurn(req: Request, res: Response) {
     return;
   }
 
+  // Gated in code, not left to the model: at the start of a new order (the
+  // first turn of a session — every order after this one starts a fresh
+  // session too, since placing an order rotates it), collect or confirm
+  // delivery info before the agent does anything else. Not on every single
+  // message — that would nag a returning customer forever — but at the one
+  // checkpoint that matters, so a saved address never silently goes stale
+  // for good the way a pure "ask once, ever" flow would. A turn that is
+  // itself a location share always falls through normally — its
+  // coordinates already got recorded above, before resolveRetailer ran.
+  const isLocationShareTurn = latitude != null && longitude != null;
+  if (isFirstTurnOfSession && !isLocationShareTurn) {
+    const body = resolved.deliveryAddress
+      ? confirmOrderDetailsMessage(resolved.deliveryAddress, resolved.paymentMode)
+      : addressOnboardingMessage();
+    res.status(200).json({
+      traceId,
+      sessionState: "active",
+      blocks: [{ type: "text", body }],
+    } satisfies AgentTurnResponse);
+    return;
+  }
+
   try {
-    const { primary, nearby, hasAddress } = resolved;
+    const { primary, nearby } = resolved;
 
     const requestContext = new RequestContext<ShoppingContextValues>();
     requestContext.set("retailerId", primary.retailerId);
@@ -198,7 +257,6 @@ export async function agentTurn(req: Request, res: Response) {
       "nearbyShopIds",
       nearby.map((shop) => shop.retailerId),
     );
-    requestContext.set("requireAddressFirst", source === "voice" && isFirstTurnOfSession && !hasAddress);
 
     // The image is read here and discarded. Only the extracted text goes into
     // the agent, so a base64 blob never enters the memory thread.

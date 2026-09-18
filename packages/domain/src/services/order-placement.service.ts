@@ -25,7 +25,7 @@ import { generateOrderCode } from '../lib/order-code';
 import {
   confirmationTokenTtlMinutes,
   defaultEtaMinutes,
-  minFulfillmentAmount,
+  additionalStoreDeliveryFee,
 } from '../constants';
 
 export class OrderPlacementService {
@@ -149,13 +149,14 @@ export class OrderPlacementService {
     }
 
     const shopIds = nearbyShopIds.map((id) => parseInt(id, 10));
-    const assignments = await this.splitAcrossShops(cartItems, shopIds);
+    const { assignments, deliveryFee } = await this.splitAcrossShops(cartItems, shopIds);
 
     if (assignments.length === 0) {
       throw AppError.validation('No shops can fulfill any items in the cart');
     }
 
-    const totalAmount = assignments.reduce((sum, a) => sum + a.subtotal, 0);
+    const productAmount = assignments.reduce((sum, a) => sum + a.subtotal, 0);
+    const totalAmount = productAmount + deliveryFee;
     const token = randomBytes(24).toString('hex');
     const expiresAt = new Date(Date.now() + confirmationTokenTtlMinutes * 60_000);
 
@@ -174,13 +175,15 @@ export class OrderPlacementService {
         subtotal: a.subtotal,
       })),
       nearbyShopIds: shopIds,
+      deliveryFee,
     };
 
     const confirmationFields = {
       addressId,
       paymentMode: paymentMode ?? 'cod',
-      productAmount: totalAmount,
+      productAmount,
       totalAmount,
+      deliveryFee,
       confirmationToken: token,
       tokenExpiresAt: expiresAt,
       confirmedSnapshot: snapshot,
@@ -217,6 +220,7 @@ export class OrderPlacementService {
       shopBreakdown,
       deliveryAddress,
       paymentMode,
+      deliveryFee: Math.round(deliveryFee * 100) / 100,
     };
   }
 
@@ -320,10 +324,26 @@ export class OrderPlacementService {
   // Splitting algorithm
   // -----------------------------------------------------------------------
 
+  /**
+   * Rule 1: if any single shop — walked in nearest-first order, since
+   * shopIds arrives distance-sorted from RetailerResolveService — stocks
+   * every item in the cart, use it alone. One store, one delivery, no
+   * delivery fee.
+   *
+   * Rule 2: otherwise a split is unavoidable. Brute-force every non-empty
+   * subset of the shops that stock at least one cart item (cart sizes and
+   * nearby-shop counts here are small, so this is cheap), keep only subsets
+   * that jointly cover the whole cart, and within each subset assign every
+   * item to its cheapest available shop. Compare subsets on
+   * items-cost + (extra stores actually used) * additionalStoreDeliveryFee,
+   * and keep the cheapest — so a split is only chosen over a cheaper
+   * single-store subset when its item savings outweigh the extra delivery
+   * fee, matching "best value for the customer", not just fewest stores.
+   */
   private async splitAcrossShops(
     cartItems: CartItemDetailRow[],
     shopIds: number[],
-  ): Promise<SnapshotAssignment[]> {
+  ): Promise<{ assignments: SnapshotAssignment[]; deliveryFee: number }> {
     const catalogIds = [...new Set(cartItems.map((i) => i.catalog_id))];
     const availability = await this.loadAvailability(catalogIds, shopIds);
 
@@ -333,100 +353,94 @@ export class OrderPlacementService {
       shopNames.set(shop.id, shop.name);
     }
 
-    const unassigned = new Set(cartItems.map((_, idx) => idx));
-    const assignments = new Map<number, SnapshotAssignment>();
-
-    while (unassigned.size > 0) {
-      let bestShopId = -1;
-      let bestCoverage: number[] = [];
-
-      for (const sid of shopIds) {
-        const covered: number[] = [];
-        for (const idx of unassigned) {
-          const item = cartItems[idx];
-          const options = availability.get(item.catalog_id);
-          if (options?.some((o) => o.shopId === sid)) {
-            covered.push(idx);
-          }
-        }
-        if (covered.length > bestCoverage.length) {
-          bestShopId = sid;
-          bestCoverage = covered;
-        }
-      }
-
-      if (bestShopId === -1) break;
-
-      const assignment: SnapshotAssignment = assignments.get(bestShopId) ?? {
-        shopId: bestShopId,
-        shopName: shopNames.get(bestShopId) ?? 'Unknown',
+    const buildSingleShopAssignment = (sid: number): SnapshotAssignment => {
+      const assignment: SnapshotAssignment = {
+        shopId: sid,
+        shopName: shopNames.get(sid) ?? 'Unknown',
         items: [],
         subtotal: 0,
       };
-
-      for (const idx of bestCoverage) {
-        const item = cartItems[idx];
-        const options = availability.get(item.catalog_id) ?? [];
-        const shopOption = options.find((o) => o.shopId === bestShopId);
-        if (!shopOption) continue;
-
+      for (const item of cartItems) {
+        const option = availability.get(item.catalog_id)!.find((o) => o.shopId === sid)!;
         assignment.items.push({
           catalogId: item.catalog_id,
           productName: item.product_name,
           quantity: item.quantity,
           unit: item.unit,
-          shopProductId: shopOption.shopProductId,
-          unitPrice: shopOption.unitPrice,
+          shopProductId: option.shopProductId,
+          unitPrice: option.unitPrice,
         });
-        assignment.subtotal += shopOption.unitPrice * item.quantity;
-        unassigned.delete(idx);
+        assignment.subtotal += option.unitPrice * item.quantity;
       }
+      return assignment;
+    };
 
-      assignments.set(bestShopId, assignment);
-    }
-
-    return this.rebalance([...assignments.values()], availability);
-  }
-
-  private rebalance(
-    assignments: SnapshotAssignment[],
-    availability: Map<number, { shopId: number; shopProductId: number; unitPrice: number }[]>,
-  ): SnapshotAssignment[] {
-    const large: SnapshotAssignment[] = [];
-    const small: SnapshotAssignment[] = [];
-
-    for (const a of assignments) {
-      if (a.subtotal >= minFulfillmentAmount) {
-        large.push(a);
-      } else {
-        small.push(a);
+    for (const sid of shopIds) {
+      const coversAll = cartItems.every((item) =>
+        availability.get(item.catalog_id)?.some((o) => o.shopId === sid),
+      );
+      if (coversAll) {
+        return { assignments: [buildSingleShopAssignment(sid)], deliveryFee: 0 };
       }
     }
 
-    for (const sa of small) {
-      let fullyReassigned = true;
+    const candidateShopIds = shopIds.filter((sid) =>
+      cartItems.some((item) => availability.get(item.catalog_id)?.some((o) => o.shopId === sid)),
+    );
 
-      for (const item of sa.items) {
-        const options = availability.get(item.catalogId) ?? [];
-        const alt = options.find(
-          (o) => o.shopId !== sa.shopId && large.some((la) => la.shopId === o.shopId),
-        );
+    if (candidateShopIds.length === 0) {
+      return { assignments: [], deliveryFee: 0 };
+    }
 
-        if (alt) {
-          const target = large.find((la) => la.shopId === alt.shopId)!;
-          target.items.push({ ...item, shopProductId: alt.shopProductId, unitPrice: alt.unitPrice });
-          target.subtotal += alt.unitPrice * item.quantity;
-        } else {
-          fullyReassigned = false;
-        }
+    let best: { assignments: SnapshotAssignment[]; deliveryFee: number; totalCost: number } | null = null;
+    const n = candidateShopIds.length;
+
+    for (let mask = 1; mask < 1 << n; mask++) {
+      const subset = candidateShopIds.filter((_, i) => mask & (1 << i));
+
+      const covers = cartItems.every((item) =>
+        availability.get(item.catalog_id)?.some((o) => subset.includes(o.shopId)),
+      );
+      if (!covers) continue;
+
+      const assignmentMap = new Map<number, SnapshotAssignment>();
+      for (const item of cartItems) {
+        const options = (availability.get(item.catalog_id) ?? []).filter((o) => subset.includes(o.shopId));
+        const cheapest = options.reduce((a, b) => (b.unitPrice < a.unitPrice ? b : a));
+
+        const assignment = assignmentMap.get(cheapest.shopId) ?? {
+          shopId: cheapest.shopId,
+          shopName: shopNames.get(cheapest.shopId) ?? 'Unknown',
+          items: [],
+          subtotal: 0,
+        };
+        assignment.items.push({
+          catalogId: item.catalog_id,
+          productName: item.product_name,
+          quantity: item.quantity,
+          unit: item.unit,
+          shopProductId: cheapest.shopProductId,
+          unitPrice: cheapest.unitPrice,
+        });
+        assignment.subtotal += cheapest.unitPrice * item.quantity;
+        assignmentMap.set(cheapest.shopId, assignment);
       }
 
-      if (!fullyReassigned) {
-        large.push(sa);
+      const assignments = [...assignmentMap.values()];
+      const itemsCost = assignments.reduce((sum, a) => sum + a.subtotal, 0);
+      const deliveryFee = Math.max(0, assignments.length - 1) * additionalStoreDeliveryFee;
+      const totalCost = itemsCost + deliveryFee;
+
+      if (!best || totalCost < best.totalCost) {
+        best = { assignments, deliveryFee, totalCost };
       }
     }
 
-    return large.filter((a) => a.items.length > 0);
+    if (!best) {
+      return { assignments: [], deliveryFee: 0 };
+    }
+
+    return { assignments: best.assignments, deliveryFee: best.deliveryFee };
   }
 
   private async loadAvailability(
