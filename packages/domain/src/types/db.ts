@@ -121,6 +121,7 @@ export interface MasterOrderInsert {
   paymentMode: string;
   productAmount: number;
   totalAmount: number;
+  deliveryFee: number;
   confirmationToken: string;
   tokenExpiresAt: Date;
   confirmedSnapshot: ConfirmedSnapshot;

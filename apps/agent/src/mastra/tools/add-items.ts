@@ -41,20 +41,20 @@ export const addItems = createTool({
     rejected: z.array(z.object({ productId: z.string(), reason: z.string() })),
   }),
   execute: async ({ items }, context) => {
-    const { retailerId, customerId } = readShoppingContext(context.requestContext);
+    const { retailerId, customerId, nearbyShopIds } = readShoppingContext(context.requestContext);
     const cartService = getServices().cart;
     const rejected: { productId: string; reason: string }[] = [];
     let cart: DomainCart | undefined;
 
     for (const item of items) {
       try {
-        cart = await cartService.mutateCart(retailerId, customerId, { action: "add", ...item });
+        cart = await cartService.mutateCart(retailerId, customerId, { action: "add", ...item }, nearbyShopIds);
       } catch (error) {
         rejected.push({ productId: item.productId, reason: toToolFailure(error).reason });
       }
     }
 
-    cart ??= await cartService.getCart(retailerId, customerId);
+    cart ??= await cartService.getCart(retailerId, customerId, nearbyShopIds);
     return { ...cart, rejected };
   },
 });

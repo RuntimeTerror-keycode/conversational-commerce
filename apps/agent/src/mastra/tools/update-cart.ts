@@ -32,9 +32,9 @@ export const updateCart = createTool({
     z.object({ error: z.literal(true), reason: z.string() }),
   ]),
   execute: async ({ action, productId, quantity, unit }, context) => {
-    const { retailerId, customerId } = readShoppingContext(context.requestContext);
+    const { retailerId, customerId, nearbyShopIds } = readShoppingContext(context.requestContext);
     return asValue(() =>
-      getServices().cart.mutateCart(retailerId, customerId, { action, productId, quantity, unit }),
+      getServices().cart.mutateCart(retailerId, customerId, { action, productId, quantity, unit }, nearbyShopIds),
     );
   },
 });

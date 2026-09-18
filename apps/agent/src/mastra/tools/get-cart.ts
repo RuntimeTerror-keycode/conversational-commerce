@@ -26,7 +26,7 @@ export const getCart = createTool({
     z.object({ error: z.literal(true), reason: z.string() }),
   ]),
   execute: async (_input, context) => {
-    const { retailerId, customerId } = readShoppingContext(context.requestContext);
-    return asValue(() => getServices().cart.getCart(retailerId, customerId));
+    const { retailerId, customerId, nearbyShopIds } = readShoppingContext(context.requestContext);
+    return asValue(() => getServices().cart.getCart(retailerId, customerId, nearbyShopIds));
   },
 });

@@ -89,6 +89,8 @@ export interface OrderConfirmationResponse {
   shopBreakdown: ShopBreakdownEntry[];
   deliveryAddress: string | null;
   paymentMode: string | null;
+  /** 0 when one store covers everything. > 0 only when a split across stores was unavoidable — already added into `total`. */
+  deliveryFee: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -131,4 +133,5 @@ export interface SnapshotAssignment {
 export interface ConfirmedSnapshot {
   assignments: SnapshotAssignment[];
   nearbyShopIds: number[];
+  deliveryFee: number;
 }
