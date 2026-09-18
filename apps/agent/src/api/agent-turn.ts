@@ -6,7 +6,13 @@ import { mastra } from "../mastra/index.js";
 import { getServices } from "../lib/services.js";
 import { resolveRetailer } from "../mastra/tools/resolve-retailer.js";
 import { scopeFor } from "../mastra/memory/config.js";
-import { currentSession, isNewSession, rotateSession } from "../mastra/memory/session-store.js";
+import {
+  currentSession,
+  isNewSession,
+  markPaymentChosen,
+  rotateSession,
+  wasPaymentChosenThisSession,
+} from "../mastra/memory/session-store.js";
 import { extractList } from "../mastra/vision/extract-list.js";
 import type { ShoppingContextValues } from "../mastra/context.js";
 
@@ -95,6 +101,14 @@ function wasOrderPlaced(steps: AgentStep[]): boolean {
   );
 }
 
+function wasPaymentModeSet(steps: AgentStep[]): boolean {
+  return steps.some((step) =>
+    step.toolResults?.some(
+      (r) => r.payload.toolName === "setPaymentMode" && (r.payload.result as { error?: boolean })?.error !== true,
+    ),
+  );
+}
+
 type ConfirmationSuccess = {
   total: number;
   deliveryAddress: string | null;
@@ -124,13 +138,22 @@ function findConfirmation(steps: AgentStep[]): ConfirmationSuccess | undefined {
  * out of sync with what actually still needs deciding. IDs are namespaced
  * `agent_*` to stay clear of apps/edge's own legacy WhatsApp-native-cart
  * button IDs (confirm_order_yes/no, address choice ids).
+ *
+ * Payment mode is asked fresh every order — `confirmation.paymentMode` is
+ * the customer's last-used default (never null once they've ever paid), so
+ * it can't tell us whether THIS order's payment was actually chosen yet;
+ * `paymentChosenThisSession` is the real signal for that.
  */
-function buildConfirmationButtons(confirmation: ConfirmationSuccess | undefined, orderPlaced: boolean): ReplyBlock | null {
+function buildConfirmationButtons(
+  confirmation: ConfirmationSuccess | undefined,
+  orderPlaced: boolean,
+  paymentChosenThisSession: boolean,
+): ReplyBlock | null {
   if (orderPlaced || !confirmation || confirmation.deliveryAddress == null) {
     return null;
   }
 
-  if (confirmation.paymentMode == null) {
+  if (!paymentChosenThisSession) {
     return {
       type: "buttons",
       body: "How would you like to pay?",
@@ -369,11 +392,18 @@ export async function agentTurn(req: Request, res: Response) {
     if (orderPlaced) {
       rotateSession(customerId);
     }
+    if (wasPaymentModeSet(result.steps)) {
+      markPaymentChosen(sessionId);
+    }
 
     const blocks: ReplyBlock[] = [
       { type: "text", body: truncate(collapseRedraftedReply(result.text), MAX_BODY_LENGTH) },
     ];
-    const confirmationButtons = buildConfirmationButtons(findConfirmation(result.steps), orderPlaced);
+    const confirmationButtons = buildConfirmationButtons(
+      findConfirmation(result.steps),
+      orderPlaced,
+      wasPaymentChosenThisSession(sessionId),
+    );
     if (confirmationButtons) {
       blocks.push(confirmationButtons);
     }
