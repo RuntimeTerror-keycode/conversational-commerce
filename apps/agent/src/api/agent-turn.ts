@@ -1,5 +1,5 @@
 import type { Request, Response } from "express";
-import { AgentTurnRequest, type AgentTurnResponse } from "@cc/contracts";
+import { AgentTurnRequest, type AgentTurnResponse, type ReplyBlock } from "@cc/contracts";
 import { AppError } from "@cc/domain";
 import { RequestContext } from "@mastra/core/request-context";
 import { mastra } from "../mastra/index.js";
@@ -85,12 +85,70 @@ function describeList(list: { items: { item: string; quantity: number | null; un
   ].join("\n");
 }
 
-function wasOrderPlaced(steps: Array<{ toolResults?: Array<{ payload: { toolName: string; result: unknown } }> }>): boolean {
+type AgentStep = { toolResults?: Array<{ payload: { toolName: string; result: unknown } }> };
+
+function wasOrderPlaced(steps: AgentStep[]): boolean {
   return steps.some((step) =>
     step.toolResults?.some(
       (r) => r.payload.toolName === "placeOrder" && (r.payload.result as { error?: boolean })?.error !== true,
     ),
   );
+}
+
+type ConfirmationSuccess = {
+  total: number;
+  deliveryAddress: string | null;
+  paymentMode: string | null;
+};
+
+/** The latest requestOrderConfirmation result this turn, or undefined if it wasn't called (or errored). */
+function findConfirmation(steps: AgentStep[]): ConfirmationSuccess | undefined {
+  for (let i = steps.length - 1; i >= 0; i--) {
+    const match = steps[i].toolResults?.find((r) => r.payload.toolName === "requestOrderConfirmation");
+    if (match) {
+      const result = match.payload.result as ConfirmationSuccess | { error: true; reason: string };
+      return "error" in result ? undefined : result;
+    }
+  }
+  return undefined;
+}
+
+/**
+ * Turns the exact same moments the model would otherwise ask about in prose
+ * ("Cash on delivery, or GPay/UPI?", "Confirm?") into real tappable WhatsApp
+ * buttons instead — apps/edge already renders `buttons` blocks as native
+ * WhatsApp interactive reply buttons (docs: send_whatsapp_poll) and forwards
+ * a tap back as if the customer had typed the button's label, so nothing
+ * downstream needs to change to handle the reply. Built deterministically
+ * from the tool result, not from the model's own text, so it can't drift
+ * out of sync with what actually still needs deciding. IDs are namespaced
+ * `agent_*` to stay clear of apps/edge's own legacy WhatsApp-native-cart
+ * button IDs (confirm_order_yes/no, address choice ids).
+ */
+function buildConfirmationButtons(confirmation: ConfirmationSuccess | undefined, orderPlaced: boolean): ReplyBlock | null {
+  if (orderPlaced || !confirmation || confirmation.deliveryAddress == null) {
+    return null;
+  }
+
+  if (confirmation.paymentMode == null) {
+    return {
+      type: "buttons",
+      body: "How would you like to pay?",
+      buttons: [
+        { id: "agent_pay_cod", label: "💵 Cash on Delivery" },
+        { id: "agent_pay_gpay", label: "📱 GPay/UPI" },
+      ],
+    };
+  }
+
+  return {
+    type: "buttons",
+    body: `Ready to place this order for ₹${confirmation.total}?`,
+    buttons: [
+      { id: "agent_confirm_yes", label: "✅ Confirm" },
+      { id: "agent_confirm_no", label: "❌ Cancel" },
+    ],
+  };
 }
 
 /** "07:00" -> "7:00 AM", to match the friendly, non-24h tone of the other WhatsApp templates. */
@@ -132,21 +190,31 @@ function paymentModeLabel(mode: string): string {
  * A returning customer, at the start of a new order — asked once per
  * session, not every message, so a saved address or payment preference
  * never silently carries over into every future order for good the way a
- * pure "ask once, ever" flow would.
+ * pure "ask once, ever" flow would. A real tappable choice (WhatsApp
+ * buttons), not a "reply yes" text prompt — see buildConfirmationButtons
+ * for why apps/edge can render this as-is.
  */
-function confirmOrderDetailsMessage(address: string, paymentMode: string | null): string {
-  return [
+function confirmOrderDetailsButtons(address: string, paymentMode: string | null): ReplyBlock {
+  const body = [
     "📍 *Confirm Order Details*",
-    `Delivering to: *${address}*`,
-    paymentMode ? `Payment: *${paymentModeLabel(paymentMode)}* (last used)` : null,
     "",
-    "Reply *yes* if these are still right, or update either — share a new location for the address, " +
-      "or just say \"cash\" or \"GPay\" to change the payment method.",
+    `> 🏠 ${address}`,
+    paymentMode ? `> 💳 ${paymentModeLabel(paymentMode)} (last used)` : null,
     "",
-    "Once confirmed, go ahead and tell me what you'd like to order! 😊",
+    "Are these still correct?",
   ]
     .filter((line): line is string => line !== null)
     .join("\n");
+
+  return {
+    type: "buttons",
+    body,
+    buttons: [
+      { id: "agent_details_yes", label: "✅ Yes, correct" },
+      { id: "agent_details_location", label: "📍 New location" },
+      { id: "agent_details_payment", label: "💳 Change payment" },
+    ],
+  };
 }
 
 export async function agentTurn(req: Request, res: Response) {
@@ -234,13 +302,13 @@ export async function agentTurn(req: Request, res: Response) {
   // coordinates already got recorded above, before resolveRetailer ran.
   const isLocationShareTurn = latitude != null && longitude != null;
   if (isFirstTurnOfSession && !isLocationShareTurn) {
-    const body = resolved.deliveryAddress
-      ? confirmOrderDetailsMessage(resolved.deliveryAddress, resolved.paymentMode)
-      : addressOnboardingMessage();
+    const block: ReplyBlock = resolved.deliveryAddress
+      ? confirmOrderDetailsButtons(resolved.deliveryAddress, resolved.paymentMode)
+      : { type: "text", body: addressOnboardingMessage() };
     res.status(200).json({
       traceId,
       sessionState: "active",
-      blocks: [{ type: "text", body }],
+      blocks: [block],
     } satisfies AgentTurnResponse);
     return;
   }
@@ -302,10 +370,18 @@ export async function agentTurn(req: Request, res: Response) {
       rotateSession(customerId);
     }
 
+    const blocks: ReplyBlock[] = [
+      { type: "text", body: truncate(collapseRedraftedReply(result.text), MAX_BODY_LENGTH) },
+    ];
+    const confirmationButtons = buildConfirmationButtons(findConfirmation(result.steps), orderPlaced);
+    if (confirmationButtons) {
+      blocks.push(confirmationButtons);
+    }
+
     const response: AgentTurnResponse = {
       traceId,
       sessionState: orderPlaced ? "order_placed" : "active",
-      blocks: [{ type: "text", body: truncate(collapseRedraftedReply(result.text), MAX_BODY_LENGTH) }],
+      blocks,
     };
 
     res.status(200).json(response);
