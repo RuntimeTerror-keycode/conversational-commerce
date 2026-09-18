@@ -85,7 +85,7 @@ export interface SessionShop {
   id: number;
   name: string;
   isActive: boolean;
-  /** 'managed' | 'external' in practice; the API types it as a plain string. */
+  /** 'managed' | 'synced' in practice; the API types it as a plain string. */
   inventoryMode: string;
   /** "HH:MM", or null when the shop has not set hours. */
   openingTime: string | null;
@@ -360,3 +360,60 @@ export interface InventoryUpdateInput {
  *  - no search on fulfillments (no `q` parameter)
  *  - `sourceText` is hardcoded null server-side and has no column
  */
+
+/* ------------------------------------------------------------------ *
+ * Dashboard stats — GET /api/stats/today
+ *
+ * Whole-shop roll-ups computed in SQL. The dashboard must never add up a
+ * page of orders and call it a day's takings.
+ * ------------------------------------------------------------------ */
+
+export interface HourlyBucket {
+  /** 0–23. */
+  hour: number;
+  /** Orders in that hour on an average day of the window. */
+  average: number;
+}
+
+export interface BusiestHours {
+  /** Always 24 entries, zero-filled — a quiet hour is a real answer. */
+  buckets: HourlyBucket[];
+  peakHour: number | null;
+  peakAverage: number;
+  windowDays: number;
+}
+
+export interface TakingsToday {
+  revenue: Money;
+  orders: number;
+  /** Units, not lines. */
+  items: number;
+  /** Same weekday last week. */
+  previousRevenue: Money;
+  changeOnLastWeek: Money;
+}
+
+export interface SpeedToday {
+  acceptedToPackedSeconds: number | null;
+  packedToDeliveredSeconds: number | null;
+  slowestSeconds: number | null;
+  slowestOrderCode: string | null;
+}
+
+export interface LowStockProduct {
+  id: number;
+  name: string;
+  category: string | null;
+  stockQuantity: number;
+  isAvailable: boolean;
+  /** Units sold per day over the window; null when it has never sold. */
+  sellsPerDay: number | null;
+}
+
+export interface DashboardStats {
+  busiestHours: BusiestHours;
+  takingsToday: TakingsToday;
+  speedToday: SpeedToday;
+  runningOut: LowStockProduct[];
+  serverTime: Timestamp;
+}

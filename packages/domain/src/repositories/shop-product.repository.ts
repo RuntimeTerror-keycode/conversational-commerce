@@ -305,6 +305,23 @@ export class ShopProductRepository {
     return result.rowCount ?? 0;
   }
 
+  /**
+   * Decrements stock on order placement (docs/contracts.md Q-I1: fires at
+   * order time, since auto-accept is immediate). Clamped at 0 rather than
+   * going negative, and flips is_available false at zero (Q-I2) — a
+   * concurrent second order for the last unit can't oversell past it.
+   */
+  public async decrementStockTx(client: PoolClient, shopProductId: number, quantity: number): Promise<void> {
+    await client.query(
+      `UPDATE shop_product
+       SET stock_quantity = GREATEST(stock_quantity - $2, 0),
+           is_available = (GREATEST(stock_quantity - $2, 0) > 0),
+           updated_at = NOW()
+       WHERE id = $1`,
+      [shopProductId, quantity],
+    );
+  }
+
   private buildWhereClause(shopId: number, q?: string, category?: string, stockState?: string) {
     const conditions: string[] = ['sp.shop_id = $1'];
     const values: unknown[] = [shopId];

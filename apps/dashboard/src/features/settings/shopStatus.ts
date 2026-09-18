@@ -53,3 +53,49 @@ export function formatHours(
   if (!openingTime || !closingTime) return null;
   return `${openingTime} – ${closingTime}`;
 }
+
+/**
+ * The line under the status word — and it must always name when it changes.
+ *
+ * "Open" alone leaves the shopkeeper wondering how long they have; "Closed
+ * now" alone leaves them wondering whether they need to do anything. Both
+ * questions are answered by saying when the state flips, and whether it flips
+ * on its own.
+ */
+export function statusDetail(shop: {
+  openState: ShopOpenState;
+  openingTime: string | null;
+  closingTime: string | null;
+}, now: Date = new Date()): string {
+  if (shop.openState === 'offline') return 'Stays off until you turn it back on';
+  if (shop.openState === 'always_open') return 'No hours set — taking orders around the clock';
+  if (shop.openState === 'closed') {
+    return shop.openingTime ? `Reopens at ${shop.openingTime}` : 'Reopens at the set time';
+  }
+
+  const until = shop.closingTime ? minutesUntil(shop.closingTime, now) : null;
+  if (!shop.closingTime || until === null) return 'Taking orders on WhatsApp';
+
+  return `Closes at ${shop.closingTime}, in ${formatGap(until)}`;
+}
+
+/** Minutes from `now` to the next occurrence of "HH:MM". */
+function minutesUntil(time: string, now: Date): number | null {
+  const [hours, minutes] = time.split(':').map(Number);
+  if (Number.isNaN(hours) || Number.isNaN(minutes)) return null;
+
+  const target = new Date(now);
+  target.setHours(hours, minutes, 0, 0);
+  // A closing time already past today belongs to tomorrow — an overnight shop.
+  if (target <= now) target.setDate(target.getDate() + 1);
+
+  return Math.round((target.getTime() - now.getTime()) / 60000);
+}
+
+/** "8h 12m", "47m". */
+function formatGap(minutes: number): string {
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  if (hours === 0) return `${rest}m`;
+  return rest === 0 ? `${hours}h` : `${hours}h ${rest}m`;
+}

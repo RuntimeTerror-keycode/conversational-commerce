@@ -39,13 +39,31 @@ export const ReplyBlock = z.discriminatedUnion("type", [
   }),
 ]);
 
+/** Inbound media the edge has already downloaded. Base64 so no URL has to be served or expire. */
+export const InboundMedia = z.object({
+  mimeType: z.enum(["image/jpeg", "image/png", "image/webp"]),
+  dataBase64: z.string(),
+});
+
 export const AgentTurnRequest = z.object({
   traceId: z.string(),
   messageId: z.string(),
   customerRef: z.string(),
   text: z.string(),
-  source: z.enum(["text", "voice"]),
+  source: z.enum(["text", "voice", "image"]),
   locale: z.string().nullable().optional(),
+  // Set only when this turn came from a real WhatsApp location share (never
+  // from a customer-typed address or a pasted map link) — apps/edge already
+  // reverse-geocoded it before this request was made. The agent persists
+  // these deterministically in code, not via a model tool call, so shop
+  // routing is never at the mercy of the model faithfully copying numbers.
+  latitude: z.number().nullable().optional(),
+  longitude: z.number().nullable().optional(),
+  // .nullable() matters here: the Python side sends an explicit JSON `null`
+  // for every non-image turn (pydantic's Optional[...] = None serializes as
+  // null, not an absent key), which a plain .optional() rejects outright —
+  // this broke every real text/voice/location message once media shipped.
+  media: InboundMedia.nullable().optional(),
 });
 
 export const AgentTurnResponse = z.object({
@@ -61,6 +79,7 @@ export const NotifyRequest = z.object({
   reason: z.enum(["order_accepted", "order_rejected", "out_for_delivery", "delivered", "substitution"]),
 });
 
+export type InboundMedia = z.infer<typeof InboundMedia>;
 export type ReplyBlock = z.infer<typeof ReplyBlock>;
 export type AgentTurnRequest = z.infer<typeof AgentTurnRequest>;
 export type AgentTurnResponse = z.infer<typeof AgentTurnResponse>;

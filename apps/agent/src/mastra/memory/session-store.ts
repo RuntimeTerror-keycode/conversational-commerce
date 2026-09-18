@@ -28,3 +28,20 @@ export function rotateSession(customerId: string): string {
   sessions.set(customerId, sessionId);
   return sessionId;
 }
+
+// Payment mode is asked fresh every order, on purpose — unlike the address,
+// which is fine to carry over and just confirm. A customer's saved
+// default_payment_mode column always has a value once they've ever paid, so
+// "is paymentMode null" can't tell us "have they chosen it for THIS order"
+// — only a session-scoped flag can. rotateSession() naturally clears this
+// for the next order, since it mints a brand-new sessionId this Set has
+// never seen.
+const paymentChosenSessions = new Set<string>();
+
+export function markPaymentChosen(sessionId: string): void {
+  paymentChosenSessions.add(sessionId);
+}
+
+export function wasPaymentChosenThisSession(sessionId: string): boolean {
+  return paymentChosenSessions.has(sessionId);
+}

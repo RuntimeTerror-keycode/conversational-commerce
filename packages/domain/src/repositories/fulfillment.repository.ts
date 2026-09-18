@@ -68,7 +68,10 @@ export class FulfillmentRepository {
     const result = await this.db.query<{ total: string; today: string }>(
       `SELECT
          COALESCE(SUM(subtotal), 0)::text AS total,
-         COALESCE(SUM(subtotal) FILTER (WHERE delivered_at >= date_trunc('day', NOW())), 0)::text AS today
+         COALESCE(SUM(subtotal) FILTER (
+           WHERE delivered_at >= date_trunc('day', NOW() AT TIME ZONE 'Asia/Kolkata')
+                                  AT TIME ZONE 'Asia/Kolkata'
+         ), 0)::text AS today
        FROM fulfillment
        WHERE shop_id = $1 AND status = 'delivered'`,
       [shopId],
@@ -100,6 +103,20 @@ export class FulfillmentRepository {
       [fulfillmentId, shopId],
     );
     return result.rows[0] ?? null;
+  }
+
+  /**
+   * All fulfillment statuses for a master order, across every shop it was
+   * split to — used to tell whether an order is FULLY delivered (every
+   * shop's half done) versus just one shop's half, so the customer never
+   * gets a "Delivered!" message while another shop is still out.
+   */
+  public async findStatusesForMasterOrder(masterOrderId: number): Promise<{ id: number; shop_id: number; status: string }[]> {
+    const result = await this.db.query<{ id: number; shop_id: number; status: string }>(
+      'SELECT id, shop_id, status FROM fulfillment WHERE master_order_id = $1',
+      [masterOrderId],
+    );
+    return result.rows;
   }
 
   public async setStatus(client: PoolClient, fulfillmentId: number, shopId: number, status: string, tsCol: string): Promise<void> {

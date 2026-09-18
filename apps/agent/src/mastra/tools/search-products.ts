@@ -27,9 +27,14 @@ export const searchProducts = createTool({
     z.object({ error: z.literal(true), reason: z.string() }),
   ]),
   execute: async ({ query, attributes, limit }, context) => {
-    const { retailerId } = readShoppingContext(context.requestContext);
+    const { retailerId, nearbyShopIds } = readShoppingContext(context.requestContext);
     return asValue(async () => {
-      const products = await getServices().catalog.searchProducts(retailerId, query, { attributes, limit });
+      const products = await getServices().catalog.searchProducts(
+        retailerId,
+        query,
+        { attributes, limit },
+        nearbyShopIds,
+      );
       return { products };
     });
   },

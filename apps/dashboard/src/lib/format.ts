@@ -56,3 +56,49 @@ export function formatDateTime(at: Timestamp): string {
 export function plural(count: number, singular: string, pluralForm?: string): string {
   return `${count} ${count === 1 ? singular : (pluralForm ?? `${singular}s`)}`;
 }
+
+/**
+ * "7 min", "1h 53m" — how long a stage took.
+ *
+ * Rounds to the minute because nobody packs an order in 38 seconds and the
+ * extra precision would only make the figure look more exact than it is.
+ */
+export function formatDuration(seconds: number): string {
+  const minutes = Math.round(seconds / 60);
+  if (minutes < 60) return `${minutes} min`;
+
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  return rest === 0 ? `${hours}h` : `${hours}h ${rest}m`;
+}
+
+/** "07:00" from an hour index. */
+export function formatHour(hour: number): string {
+  return `${String(hour).padStart(2, '0')}:00`;
+}
+
+/**
+ * "+91 98471 00001" from "919847100001".
+ *
+ * Stored as raw digits, never shown as them — a twelve-digit run is unreadable
+ * and unmemorable, and this is the number the shopkeeper recognises as theirs.
+ * Anything that does not look like an Indian number is returned untouched
+ * rather than mangled into a shape it is not.
+ */
+export function formatPhone(phone: string): string {
+  const digits = phone.replace(/\D/g, '');
+  if (digits.length === 12 && digits.startsWith('91')) {
+    return `+91 ${digits.slice(2, 7)} ${digits.slice(7)}`;
+  }
+  if (digits.length === 10) {
+    return `${digits.slice(0, 5)} ${digits.slice(5)}`;
+  }
+  return phone;
+}
+
+/** "SK" from "Suresh Kumar" — at most two letters. */
+export function initials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return '?';
+  return (parts[0][0] + (parts.length > 1 ? parts[parts.length - 1][0] : '')).toUpperCase();
+}

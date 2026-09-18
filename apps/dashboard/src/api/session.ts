@@ -1,5 +1,11 @@
 import { request } from './client';
-import { clearStoredSession, readStoredSession, storeSession } from './shop-context';
+import {
+  clearStoredSession,
+  readRememberedUsername,
+  readStoredSession,
+  rememberUsername,
+  storeSession,
+} from './shop-context';
 import type { Session } from './types';
 
 /**
@@ -18,6 +24,7 @@ export async function identify(username: string): Promise<Session> {
   });
 
   storeSession(session);
+  rememberUsername(username);
   return session;
 }
 
@@ -26,4 +33,4 @@ export function signOut(): void {
   clearStoredSession();
 }
 
-export { readStoredSession };
+export { readStoredSession, readRememberedUsername };

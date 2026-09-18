@@ -11,6 +11,8 @@ export class ShopRepository {
     const result = await this.db.query<ShopWithLocationRow>(
       `SELECT
         s.id, s.name, s.is_active, s.delivery_radius_km::float AS delivery_radius_km,
+        to_char(s.opening_time, 'HH24:MI') AS opening_time,
+        to_char(s.closing_time, 'HH24:MI') AS closing_time,
         a.latitude::float AS latitude,
         a.longitude::float AS longitude,
         a.city

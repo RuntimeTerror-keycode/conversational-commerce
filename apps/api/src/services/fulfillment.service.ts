@@ -4,6 +4,7 @@ import {
   OrderItemRepository,
   OrderEventRepository,
   ShopProductRepository,
+  MasterOrderRepository,
   IDatabase,
 } from '@cc/domain';
 import { Logger } from '../logger/logger';
@@ -51,6 +52,7 @@ export class FulfillmentService {
   private readonly orderItemRepo: OrderItemRepository;
   private readonly orderEventRepo: OrderEventRepository;
   private readonly shopProductRepo: ShopProductRepository;
+  private readonly masterOrderRepo: MasterOrderRepository;
   private readonly db: IDatabase;
   private readonly notifyService: NotifyService;
   private readonly logger: Logger;
@@ -60,6 +62,7 @@ export class FulfillmentService {
     orderItemRepo: OrderItemRepository,
     orderEventRepo: OrderEventRepository,
     shopProductRepo: ShopProductRepository,
+    masterOrderRepo: MasterOrderRepository,
     db: IDatabase,
     notifyService: NotifyService,
     logger: Logger,
@@ -68,6 +71,7 @@ export class FulfillmentService {
     this.orderItemRepo = orderItemRepo;
     this.orderEventRepo = orderEventRepo;
     this.shopProductRepo = shopProductRepo;
+    this.masterOrderRepo = masterOrderRepo;
     this.db = db;
     this.notifyService = notifyService;
     this.logger = logger.child('FulfillmentService');
@@ -132,6 +136,7 @@ export class FulfillmentService {
 
     return {
       id: f.id,
+      masterOrderId: f.master_order_id,
       orderCode: f.order_code,
       status: f.status as FulfillmentStatus,
       customer: { displayName: f.customer_name, phone: f.customer_phone },
@@ -223,17 +228,62 @@ export class FulfillmentService {
     }
 
     if (targetStatus === 'delivered') {
-      const body = [
-        '📦 *Delivered!*',
-        `Your order \`${detail.orderCode}\` has been delivered.`,
-        '',
-        'Thanks for shopping with us — enjoy! 🛍️',
-      ].join('\n');
+      const siblings = await this.fulfillmentRepo.findStatusesForMasterOrder(detail.masterOrderId);
+      const allDelivered = siblings.every((s) => s.status === 'delivered');
 
-      await this.notifyService.send(detail.customer.phone, [{ type: 'text', body }], 'delivered', detail.traceId);
+      if (!allDelivered) {
+        // A split order: this shop's half is done, but at least one other
+        // shop's half is still in flight. Say so plainly instead of
+        // sending the same "Delivered!" text a fully-done order gets —
+        // the customer's order isn't fully in hand yet.
+        const body = [
+          '📦 *Part of your order has been delivered!*',
+          `One part of order \`${detail.orderCode}\` has arrived. The rest is still on its way — you'll hear again once everything's delivered.`,
+        ].join('\n');
+
+        await this.notifyService.send(detail.customer.phone, [{ type: 'text', body }], 'delivered', detail.traceId);
+      } else {
+        const body = await this.buildFinalOrderSummary(detail.masterOrderId, detail.orderCode);
+        await this.notifyService.send(detail.customer.phone, [{ type: 'text', body }], 'delivered', detail.traceId);
+      }
     }
 
     return detail;
+  }
+
+  /**
+   * Sent once, only after every shop a master order was split to has
+   * delivered its half. Built from the confirmed_snapshot captured at
+   * checkout — the same prices/items the customer already confirmed — not
+   * a fresh read of shop_product, which could have moved on since.
+   */
+  private async buildFinalOrderSummary(masterOrderId: number, orderCode: string): Promise<string> {
+    const order = await this.masterOrderRepo.findById(masterOrderId);
+    const assignments = order?.confirmed_snapshot?.assignments ?? [];
+    const deliveryFee = order ? parseFloat(order.delivery_fee) : 0;
+    const totalAmount = order ? parseFloat(order.total_amount) : 0;
+    const paymentLabel = order?.payment_mode === 'gpay' ? 'GPay/UPI' : 'Cash on Delivery';
+
+    const lines = ['🧾 *Order Delivered — Summary*', `Order \`${orderCode}\``, ''];
+
+    assignments.forEach((assignment, index) => {
+      if (assignments.length > 1) {
+        lines.push(`*Store ${index + 1}:*`);
+      }
+      for (const item of assignment.items) {
+        lines.push(`• ${item.productName} x${item.quantity} — ₹${item.unitPrice * item.quantity}`);
+      }
+      if (assignments.length > 1) {
+        lines.push(`Subtotal: ₹${assignment.subtotal}`, '');
+      }
+    });
+
+    if (deliveryFee > 0) {
+      lines.push(`Delivery fee: ₹${deliveryFee}`);
+    }
+    lines.push(`Total paid: ₹${totalAmount} (${paymentLabel})`, '', 'Thanks for shopping with us — enjoy! 🛍️');
+
+    return lines.join('\n');
   }
 
   public async updateItem(params: LineItemUpdate): Promise<FulfillmentDetail> {

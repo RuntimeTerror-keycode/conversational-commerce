@@ -8,4 +8,5 @@ export const queryKeys = {
   inventory: (query: InventoryListQuery) => ['inventory', query] as const,
   catalogOptions: (q: string) => ['catalog-options', q] as const,
   shopSettings: ['shop-settings'] as const,
+  dashboardStats: ['dashboard-stats'] as const,
 };

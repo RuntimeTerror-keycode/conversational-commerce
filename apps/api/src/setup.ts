@@ -10,6 +10,7 @@ import {
   OrderItemRepository,
   OrderEventRepository,
   ShopProductRepository,
+  StatsRepository,
   CustomerRepository,
   ShopRepository,
   CategoryRepository,
@@ -24,6 +25,7 @@ import { IdentifyService } from './services/identify.service';
 import { FulfillmentService } from './services/fulfillment.service';
 import { InventoryService } from './services/inventory.service';
 import { ShopService } from './services/shop.service';
+import { StatsService } from './services/stats.service';
 
 // Domain services — from domain
 import {
@@ -55,6 +57,7 @@ import { OrderController } from './controllers/order.controller';
 import { WhatsappController } from './controllers/whatsapp.controller';
 import { InventorySyncController } from './controllers/inventory-sync.controller';
 import { ShopController } from './controllers/shop.controller';
+import { StatsController } from './controllers/stats.controller';
 
 // Middlewares
 import { RequestLogger } from './middlewares/request-logger.middleware';
@@ -76,6 +79,7 @@ export interface AppControllers {
   whatsapp: WhatsappController;
   inventorySync: InventorySyncController;
   shop: ShopController;
+  stats: StatsController;
 }
 
 export interface AppMiddlewares {
@@ -111,6 +115,7 @@ export class Setup {
     const shopProductRepo = new ShopProductRepository(db);
     const customerRepo = new CustomerRepository(db);
     const shopRepo = new ShopRepository(db);
+    const statsRepo = new StatsRepository(db);
     const categoryRepo = new CategoryRepository(db);
     const catalogRepo = new CatalogRepository(db);
     const cartRepo = new CartRepository(db);
@@ -125,10 +130,11 @@ export class Setup {
     // Dashboard services
     const identifyService = new IdentifyService(shopUserRepo, logger);
     const fulfillmentService = new FulfillmentService(
-      fulfillmentRepo, orderItemRepo, orderEventRepo, shopProductRepo, db, notifyService, logger,
+      fulfillmentRepo, orderItemRepo, orderEventRepo, shopProductRepo, masterOrderRepo, db, notifyService, logger,
     );
     const inventoryService = new InventoryService(shopProductRepo, shopRepo, logger);
     const shopService = new ShopService(shopRepo, logger);
+    const statsService = new StatsService(statsRepo, shopProductRepo, logger);
 
     // Agent-facing services (from @cc/domain, take ILogger)
     const retailerService = new RetailerResolveService(customerRepo, shopRepo, logger);
@@ -144,6 +150,7 @@ export class Setup {
       fulfillmentRepo,
       orderItemRepo,
       orderEventRepo,
+      shopProductRepo,
       db,
       logger,
     });
@@ -180,6 +187,7 @@ export class Setup {
         whatsapp: new WhatsappController(whatsappService),
         inventorySync: new InventorySyncController(inventorySyncService),
         shop: new ShopController(shopService),
+        stats: new StatsController(statsService),
       },
       middlewares: {
         cors: new CorsMiddleware(),

@@ -178,12 +178,14 @@ export function OrdersPage() {
     <>
       <PageHeader eyebrow="The work queue" title="Orders" />
 
-      <div className="mx-auto flex max-w-content flex-col gap-[22px] px-4 pb-[30px] md:px-9">
-        <Segmented items={tabs} value={tab} onChange={setTab} />
+      <div className="mx-auto flex min-h-0 w-full max-w-content flex-1 flex-col gap-[22px] px-4 pb-[30px] md:px-9">
+        <div className="shrink-0">
+          <Segmented items={tabs} value={tab} onChange={setTab} />
+        </div>
 
-        <div className="overflow-hidden rounded-lg border border-border bg-surface">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-border bg-surface">
           {/* Stage banner — teaches the model to a first-time user. */}
-          <div className="flex items-center gap-2.5 border-b border-border bg-surface-sunken px-[22px] py-3">
+          <div className="flex shrink-0 items-center gap-2.5 border-b border-border bg-surface-sunken px-[22px] py-3">
             <Badge tone={stage.tone}>{stage.label}</Badge>
             <span className="text-small text-text-secondary">{stage.hint}</span>
           </div>
@@ -191,7 +193,7 @@ export function OrdersPage() {
           <div
             className={cn(
               grid,
-              'border-b border-border py-2.5 text-caption text-text-muted uppercase',
+              'shrink-0 border-b border-border py-2.5 text-caption text-text-muted uppercase',
             )}
           >
             <div>Order</div>
@@ -202,7 +204,9 @@ export function OrdersPage() {
             <div />
           </div>
 
-          <div aria-live="polite" aria-busy={isPending}>
+          {/* Only the rows move; tabs, stage banner, column headings and the
+              footer stay where the reader left them. */}
+          <div className="min-h-0 flex-1 overflow-y-auto" aria-live="polite" aria-busy={isPending}>
             {isPending && !data ? (
               <div className="divide-y divide-neutral-bg">
                 {Array.from({ length: 3 }, (_, index) => (
@@ -251,7 +255,7 @@ export function OrdersPage() {
             )}
           </div>
 
-          <div className="flex items-center justify-between gap-3 border-t border-border bg-surface-sunken px-[22px] py-2.5 text-caption tracking-normal text-text-muted">
+          <div className="flex shrink-0 items-center justify-between gap-3 border-t border-border bg-surface-sunken px-[22px] py-2.5 text-caption tracking-normal text-text-muted">
             <span className="flex items-center gap-2">
               <span
                 className={cn(

@@ -11,11 +11,11 @@ interface PageHeaderProps {
 }
 
 /**
- * Sticky, hairline-bottomed, and deliberately quiet.
+ * Fixed above the scroll area, and deliberately quiet.
  *
- * It stays put while a long order list scrolls so the page title and the live
- * indicator never leave the screen — on a counter display the shopkeeper is
- * often several screens down the list.
+ * The shell gives each page the viewport and lets its content scroll inside,
+ * so the title never leaves the screen — on a counter display the shopkeeper
+ * is often several screens down a list.
  */
 export function PageHeader({
   eyebrow,
@@ -27,7 +27,7 @@ export function PageHeader({
   return (
     <header
       className={cn(
-        'sticky top-0 z-20 bg-canvas/85 backdrop-blur-md',
+        'shrink-0 bg-canvas',
         className,
       )}
     >

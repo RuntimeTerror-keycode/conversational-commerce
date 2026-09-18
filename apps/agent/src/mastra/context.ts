@@ -16,8 +16,6 @@ export type ShoppingContextValues = {
   retailerName: string;
   area: string;
   nearbyShopIds: string[];
-  /** True only on a session's first turn, when it arrived as voice and no delivery address is on file. */
-  requireAddressFirst: boolean;
 };
 
 export type ShoppingRequestContext = RequestContext<ShoppingContextValues>;
@@ -30,6 +28,5 @@ export function readShoppingContext(requestContext: unknown): ShoppingContextVal
     retailerName: ctx.get("retailerName"),
     area: ctx.get("area"),
     nearbyShopIds: ctx.get("nearbyShopIds") ?? [],
-    requireAddressFirst: ctx.get("requireAddressFirst") ?? false,
   };
 }

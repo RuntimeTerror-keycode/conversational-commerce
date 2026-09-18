@@ -15,11 +15,19 @@ export class CatalogSearchService {
     this.logger = logger.child('CatalogSearchService');
   }
 
-  /** retailerId is the scoping boundary — search is always against a single shop. */
+  /**
+   * retailerId is the scoping boundary and stays the first argument, but
+   * matching/pricing is checked against the full nearbyShopIds set (falling
+   * back to just retailerId when the caller has none) — a customer must be
+   * able to find and order a product that only a farther-but-still-nearby
+   * shop stocks, since that's exactly what the best-value multi-store split
+   * at checkout exists to handle.
+   */
   public async searchProducts(
     retailerId: string,
     query: string,
     opts?: { attributes?: Record<string, string>; limit?: number },
+    nearbyShopIds: string[] = [],
   ): Promise<DomainProduct[]> {
     if (!query || query.trim().length === 0) {
       throw AppError.validation('query is required');
@@ -30,6 +38,7 @@ export class CatalogSearchService {
       throw AppError.validation('retailerId must be a valid number');
     }
 
+    const shopIds = nearbyShopIds.length > 0 ? nearbyShopIds.map((id) => parseInt(id, 10)) : [shopId];
     const limit = Math.min(opts?.limit ?? defaultSearchLimit, maxSearchLimit);
     const tokens = this.tokenize(query);
 
@@ -37,7 +46,7 @@ export class CatalogSearchService {
       return [];
     }
 
-    const rows = await this.catalogRepo.search(tokens, [shopId], limit);
+    const rows = await this.catalogRepo.search(tokens, shopIds, limit);
 
     this.logger.info('Product search', {
       retailerId,
@@ -59,6 +68,7 @@ export class CatalogSearchService {
   public async checkAvailability(
     retailerId: string,
     productIds: string[],
+    nearbyShopIds: string[] = [],
   ): Promise<AvailabilityResult[]> {
     if (productIds.length === 0) {
       throw AppError.validation('productIds must not be empty');
@@ -69,13 +79,15 @@ export class CatalogSearchService {
       throw AppError.validation('retailerId must be a valid number');
     }
 
+    const shopIds = nearbyShopIds.length > 0 ? nearbyShopIds.map((id) => parseInt(id, 10)) : [shopId];
+
     const catalogIds = productIds.map((id) => {
       const n = parseInt(id, 10);
       if (isNaN(n)) throw AppError.validation(`Invalid productId: ${id}`);
       return n;
     });
 
-    const stockRows = await this.catalogRepo.checkAvailabilityAtShop(catalogIds, shopId);
+    const stockRows = await this.catalogRepo.checkAvailabilityAtShop(catalogIds, shopIds);
     const stockMap = new Map(stockRows.map((r) => [r.catalog_id, r]));
 
     const results: AvailabilityResult[] = [];
@@ -86,7 +98,7 @@ export class CatalogSearchService {
 
       let substitutes: AvailabilityResult['substitutes'] = [];
       if (!inStock) {
-        const subs = await this.catalogRepo.findSubstitutes(catalogId, shopId, 3);
+        const subs = await this.catalogRepo.findSubstitutes(catalogId, shopIds, 3);
         substitutes = subs.map((s) => ({
           id: String(s.catalog_id),
           name: s.name,

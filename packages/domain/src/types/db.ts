@@ -29,6 +29,8 @@ export interface ShopWithLocationRow {
   id: number;
   name: string;
   is_active: boolean;
+  opening_time: string | null;
+  closing_time: string | null;
   delivery_radius_km: number | null;
   latitude: number | null;
   longitude: number | null;
@@ -104,6 +106,7 @@ export interface MasterOrderRow {
   delivery_note: string | null;
   product_amount: string;
   total_amount: string;
+  delivery_fee: string;
   confirmation_token: string | null;
   token_expires_at: Date | null;
   confirmed_snapshot: ConfirmedSnapshot | null;
@@ -119,6 +122,7 @@ export interface MasterOrderInsert {
   paymentMode: string;
   productAmount: number;
   totalAmount: number;
+  deliveryFee: number;
   confirmationToken: string;
   tokenExpiresAt: Date;
   confirmedSnapshot: ConfirmedSnapshot;

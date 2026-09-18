@@ -66,5 +66,6 @@ export * from './identify.types';
 export * from './shop.types';
 export * from './fulfillment.types';
 export * from './inventory.types';
+export * from './stats.types';
 export * from './inventory-sync.types';
 export * from './whatsapp.types';

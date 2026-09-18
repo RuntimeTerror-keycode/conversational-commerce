@@ -40,7 +40,7 @@ export function useSignOut() {
     onSuccess: () => {
       // Navigate before clearing, so guarded routes are already unmounted and
       // do not fire a round of requests with no shop id attached.
-      navigate('/login', { replace: true });
+      navigate('/login', { replace: true, state: { signedOut: true } });
       queryClient.clear();
     },
   });

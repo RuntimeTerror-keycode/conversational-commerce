@@ -41,14 +41,28 @@ export class OrderNotifyService {
       return;
     }
 
-    const body = [
-      '✅ *Order Confirmed!*',
-      `Your order \`${order.order_code}\` has been accepted and is being prepared.`,
-      '',
-      `⏱️ Estimated delivery: *~${etaMinutes} minutes*`,
-      '',
-      'Thanks for shopping with us! 🛒',
-    ].join('\n');
+    const assignments = order.confirmed_snapshot?.assignments ?? [];
+    const body =
+      assignments.length > 1
+        ? [
+            '✅ *Order Confirmed!*',
+            `Your order \`${order.order_code}\` has been accepted — it'll come as ${assignments.length} separate deliveries from ${assignments.length} stores:`,
+            ...assignments.map((a, i) => `• Store ${i + 1} — ${a.items.length} item${a.items.length === 1 ? '' : 's'}, ₹${a.subtotal}`),
+            '',
+            `⏱️ Estimated delivery: *~${etaMinutes} minutes* each`,
+            '',
+            'Need an update? Just reach out to us with this order number.',
+            '',
+            'Thanks for shopping with us! 🛒',
+          ].join('\n')
+        : [
+            '✅ *Order Confirmed!*',
+            `Your order \`${order.order_code}\` has been accepted and is being prepared.`,
+            '',
+            `⏱️ Estimated delivery: *~${etaMinutes} minutes*`,
+            '',
+            'Thanks for shopping with us! 🛒',
+          ].join('\n');
 
     await this.notifyService.send(customer.phone, [{ type: 'text', body }], 'order_accepted', order.trace_id);
   }

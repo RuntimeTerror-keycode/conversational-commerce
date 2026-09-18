@@ -6,6 +6,7 @@ export { AppError, ErrorCode } from './lib/app-error';
 export { haversineKm } from './lib/geo';
 export { generateOrderCode } from './lib/order-code';
 export { classifyMatches, formatIndianPrice, MatchClassification } from './lib/match-classification';
+export { isWithinOpeningHours } from './lib/shop-hours';
 
 // Constants
 export * from './constants';
@@ -21,6 +22,7 @@ export { ShopProductRepository } from './repositories/shop-product.repository';
 export { FulfillmentRepository } from './repositories/fulfillment.repository';
 export { OrderItemRepository } from './repositories/order-item.repository';
 export { OrderEventRepository } from './repositories/order-event.repository';
+export { StatsRepository } from './repositories/stats.repository';
 export { ShopUserRepository } from './repositories/shop-user.repository';
 export { MessageRepository } from './repositories/message.repository';
 
