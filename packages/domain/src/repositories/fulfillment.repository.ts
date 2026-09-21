@@ -86,10 +86,12 @@ export class FulfillmentRepository {
         f.*,
         mo.order_code, mo.delivery_type, mo.delivery_note, mo.payment_mode, mo.trace_id,
         c.display_name AS customer_name, c.phone AS customer_phone,
-        a.address_line, a.city, a.pincode
+        a.address_line, a.city, a.pincode,
+        s.name AS shop_name
       FROM fulfillment f
       JOIN master_order mo ON mo.id = f.master_order_id
       JOIN customer c ON c.id = mo.customer_id
+      JOIN shop s ON s.id = f.shop_id
       LEFT JOIN address a ON a.id = mo.address_id
       WHERE f.id = $1 AND f.shop_id = $2`,
       [fulfillmentId, shopId],

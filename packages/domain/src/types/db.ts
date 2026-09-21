@@ -211,6 +211,7 @@ export interface FulfillmentDetailRow {
   id: number;
   master_order_id: number;
   shop_id: number;
+  shop_name: string;
   status: string;
   subtotal: string;
   accepted_at: Date | null;

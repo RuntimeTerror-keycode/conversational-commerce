@@ -5,13 +5,13 @@ export const defaultEtaMinutes = 30;
 export const minFulfillmentAmount = 400;
 
 /**
- * Charged per extra store beyond the first when an order has to split —
- * one additional real-world delivery run per extra store. Factored directly
- * into the best-value store-combination search in OrderPlacementService, so
- * a split is only ever chosen when it's still cheaper for the customer after
- * this fee, not just whenever it happens to need fewer stores.
+ * Charged per extra store beyond the first when an order has to split.
+ * Zeroed out for the demo — a split order still picks the cheapest valid
+ * store combination, it just doesn't carry an extra visible charge for
+ * doing so. Set back to a real value (e.g. 25) once delivery pricing is
+ * actually decided.
  */
-export const additionalStoreDeliveryFee = 25;
+export const additionalStoreDeliveryFee = 0;
 
 export const cartActions = ['add', 'remove', 'set'] as const;
 export type CartAction = typeof cartActions[number];
