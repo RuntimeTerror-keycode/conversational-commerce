@@ -46,6 +46,8 @@ INSERT INTO catalog (id, name, brand, category_id, unit, sku, description) VALUE
     (13, 'Sprite Lemon Lime 750ml PET Bottle',       'Sprite',     2, 'bottle', 'BEV-SPR-750',   NULL),
     (14, 'Thums Up 750ml PET Bottle',                'Thums Up',   2, 'bottle', 'BEV-THU-750',   NULL),
     (15, 'Limca Lime & Lemon 750ml PET Bottle',      'Limca',      2, 'bottle', 'BEV-LIM-750',   NULL),
+    (66, 'Nisa Soda Sambaram 200ml',                 'Nisa',       2, 'bottle', 'BEV-NSS-200',   NULL),
+    (68, 'Red Bull Energy Drink 250ml Can',          'Red Bull',   2, '250ml',  'BEV-RBL-250',   NULL),
 
     -- Snacks & Chips
     (16, 'Lay''s Classic Salted Potato Chips 52g',   'Lay''s',     3, 'pack',   'SNK-LAY-52',    NULL),
@@ -54,6 +56,10 @@ INSERT INTO catalog (id, name, brand, category_id, unit, sku, description) VALUE
     (19, 'Bingo Mad Angles Tomato Madness 72.5g',    'Bingo',      3, 'pack',   'SNK-BMA-72',    NULL),
     (20, 'Kerala Banana Chips Salted 200g',          NULL,         3, 'pack',   'SNK-KBC-200',   NULL),
     (21, 'Kerala Jackfruit Chips 150g',              NULL,         3, 'pack',   'SNK-JFC-150',   NULL),
+    (65, 'Lay''s India''s Magic Masala Chips 52g',    'Lay''s',     3, 'pack',   'SNK-LMM-52',    NULL),
+    (67, 'Lay''s Hot & Sweet Chilli Potato Chips 52g','Lay''s',     3, 'pack',   'SNK-LHS-52',    NULL),
+    (69, 'Lay''s Classic Salted Potato Chips 90g',    'Lay''s',     3, 'pack',   'SNK-LAY-90',    NULL),
+    (70, 'Lay''s India''s Magic Masala Chips 90g',    'Lay''s',     3, 'pack',   'SNK-LMM-90',    NULL),
 
     -- Rice & Grains
     (22, 'Jaya Rice 5kg Bag',                        'Jaya',       4, 'kg',     'RIC-JAY-5',     NULL),
@@ -118,7 +124,7 @@ INSERT INTO catalog (id, name, brand, category_id, unit, sku, description) VALUE
     (63, 'Nirapara Rice Powder 1kg',                'Nirapara',    12, 'kg',    'FLR-NRP-1',     NULL),
     (64, 'Nirapara Appam Podi (Rice Flour for Appam) 1kg','Nirapara',12,'kg',  'FLR-NAP-1',     NULL);
 
-SELECT setval('catalog_id_seq', 64);
+SELECT setval('catalog_id_seq', 70);
 
 -- ============================================================
 -- TAGS (search aliases — casual English terms customers might type)
@@ -180,6 +186,16 @@ INSERT INTO tag (catalog_id, tag) VALUES
 
     -- Snacks — brand or type
     (16, 'chips'), (16, 'lays'), (16, 'potato chips'), (16, 'salted chips'),
+    (65, 'magic masala'), (65, 'lays magic masala'), (65, 'masala chips'),
+    (65, 'masala lays'), (65, 'india''s magic masala'), (65, 'blue lays'),
+    (67, 'hot n sweet'), (67, 'hot and sweet'), (67, 'sweet chilli'),
+    (67, 'chilli chips'), (67, 'lays hot n sweet'), (67, 'hot chips'),
+    (69, 'chips'), (69, 'lays'), (69, 'potato chips'), (69, 'salted chips'),
+    (69, 'big lays'), (69, 'family pack lays'),
+    (70, 'magic masala'), (70, 'lays magic masala'), (70, 'masala chips'),
+    (70, 'masala lays'), (70, 'india''s magic masala'), (70, 'blue lays'),
+    (70, 'big lays'), (70, 'family pack lays'),
+    (67, 'orange lays'),
     (17, 'kurkure'), (17, 'masala snack'),
     (18, 'bhujia'), (18, 'aloo bhujia'), (18, 'namkeen'),
     (19, 'bingo'), (19, 'mad angles'), (19, 'triangle chips'),
@@ -199,6 +215,10 @@ INSERT INTO tag (catalog_id, tag) VALUES
     (8,  'orange juice'), (8,  'tropicana'), (8,  'oj'),
     (9,  'mixed fruit juice'), (9,  'fruit juice'),
     (10, 'frooti'), (10, 'mango juice'), (10, 'mango drink'),
+    -- Sambaram is spiced buttermilk; "moru" is what most people actually say
+    (66, 'sambaram'), (66, 'moru'), (66, 'neer moru'), (66, 'buttermilk'),
+    (66, 'spiced buttermilk'), (66, 'nisa sambaram'),
+    (68, 'red bull'), (68, 'redbull'), (68, 'energy drink'),
     (11, 'aam panna'),
     (12, 'coke'), (12, 'cola'), (12, 'coca cola'),
     (13, 'sprite'), (13, 'lemon soda'),
@@ -221,45 +241,56 @@ INSERT INTO tag (catalog_id, tag) VALUES
 -- ============================================================
 
 INSERT INTO address (id, label, address_line, city, pincode, latitude, longitude) VALUES
-    -- Shop addresses
-    (1, 'Krishna Supermart',   'Edappally Junction, NH 66',        'Kochi', '682024', 10.0261, 76.3125),
-    (2, 'Maveli Stores',       'Kakkanad Main Road, Infopark Rd',  'Kochi', '682030', 10.0159, 76.3419),
-    (3, 'Lakshmi Grocery',     'Princess Street, Fort Kochi',      'Kochi', '682001',  9.9658, 76.2421),
+    -- Shop addresses. Real Kakkanad shops, ordered by distance from Smart City
+    -- Kochi (10.008, 76.371) — 55m, 1.3km, 3.3km, 4.6km straight line.
+    -- These are locality
+    -- centroids for the published street address, so treat them as +/- 300m.
+    -- FineMart is on the Smart City campus itself, so it is the nearest by far.
+    (1, 'FineMart',            'Smart City Kochi, Kakkanad',       'Kochi', '682042', 10.0083, 76.3706),
+    (2, 'We Mart',             'Infopark Road, Edachira',          'Kochi', '682030', 10.0125, 76.3600),
+    (3, 'Centreal Bazaar',     'Ajiyal Complex, Opp Kakkanad Post Office','Kochi','682030', 10.0159, 76.3419),
+    (4, 'More Supermarket',    'Judgemukku, Seaport-Airport Road, Thrikkakara','Kochi','682021', 10.0300, 76.3350),
     -- Customer addresses
-    (4, 'Home',                'Palarivattom, Metro Pillar 42',    'Kochi', '682025', 10.0074, 76.3096),
-    (5, 'Home',                'Kakkanad, Near Infopark Gate 1',   'Kochi', '682030', 10.0200, 76.3450),
-    (6, 'Office',              'Infopark Phase 1, Kakkanad',       'Kochi', '682042', 10.0108, 76.3610);
+    (5, 'Home',                'Palarivattom, Metro Pillar 42',    'Kochi', '682025', 10.0074, 76.3096),
+    (6, 'Home',                'Kakkanad, Near Infopark Gate 1',   'Kochi', '682030', 10.0200, 76.3450),
+    (7, 'Office',              'Infopark Phase 1, Kakkanad',       'Kochi', '682042', 10.0108, 76.3610);
 
-SELECT setval('address_id_seq', 6);
+SELECT setval('address_id_seq', 7);
 
 -- ============================================================
 -- SHOPS
 -- ============================================================
 
 INSERT INTO shop (id, name, owner_name, phone, opening_time, closing_time, is_active, delivery_radius_km, inventory_mode) VALUES
-    (1, 'Krishna Supermart',  'Suresh Kumar',  '919847100001', '07:00', '22:00', true, 5.0,  'managed'),
-    (2, 'Maveli Stores',      'Anil Menon',    '919847100002', '08:00', '21:00', true, 4.0,  'managed'),
-    (3, 'Lakshmi Grocery',    'Geetha Nair',   '919847100003', '06:30', '21:30', true, 3.5,  'synced');
+    -- Every shop but More runs its own billing system, so this portal mirrors
+    -- their stock read-only. More is the one whose inventory we manage.
+    (1, 'FineMart',         'John Mathew',   '919847100001', '07:00', '22:00', true, 5.0,  'synced'),
+    (2, 'We Mart',          'Hari Menon',    '919847100002', '08:00', '21:00', true, 4.0,  'synced'),
+    (3, 'Centreal Bazaar',  'Asif Rahman',   '919847100003', '06:30', '21:30', true, 3.5,  'synced'),
+    (4, 'More Supermarket', 'Geetha Nair',   '919847100004', '09:00', '22:00', true, 6.0,  'managed');
 
-SELECT setval('shop_id_seq', 3);
+SELECT setval('shop_id_seq', 4);
 
-INSERT INTO shop_address (shop_id, address_id) VALUES (1, 1), (2, 2), (3, 3);
+INSERT INTO shop_address (shop_id, address_id) VALUES (1, 1), (2, 2), (3, 3), (4, 4);
 
 -- ============================================================
 -- CUSTOMERS (demo — upserted from WhatsApp in production)
 -- ============================================================
 
+-- No display_name — a real WhatsApp customer is just a phone number until
+-- they choose to tell the store their name, which nothing in this product
+-- currently asks for.
 INSERT INTO customer (id, phone, display_name, language) VALUES
-    (1, '919847012345', 'Rajesh',  'en'),
-    (2, '919847067890', 'Priya',   'en'),
-    (3, '919847011111', 'Arun',    'en');
+    (1, '919847012345', NULL, 'en'),
+    (2, '919847067890', NULL, 'en'),
+    (3, '919847011111', NULL, 'en');
 
 SELECT setval('customer_id_seq', 3);
 
 INSERT INTO customer_address (customer_id, address_id, address_type, is_default) VALUES
-    (1, 4, 'home', true),
-    (2, 5, 'home', true),
-    (3, 6, 'work', true);
+    (1, 5, 'home', true),
+    (2, 6, 'home', true),
+    (3, 7, 'work', true);
 
 -- ============================================================
 -- SHOP_PRODUCT
@@ -269,7 +300,7 @@ INSERT INTO customer_address (customer_id, address_id, address_type, is_default)
 -- local_name = NULL means they happen to match our catalog name.
 -- ============================================================
 
--- Shop 1: Krishna Supermart (large supermarket, somewhat clean naming but still inconsistent)
+-- Shop 1: FineMart (on the Smart City campus — the nearest shop to most customers)
 INSERT INTO shop_product (shop_id, catalog_id, local_name, regular_price, selling_price, stock_quantity, low_stock_threshold, is_available) VALUES
     -- Biscuits
     (1, 1,  'Parle G 1kg',                  110.00,  99.00,  50, 10, true),
@@ -290,6 +321,12 @@ INSERT INTO shop_product (shop_id, catalog_id, local_name, regular_price, sellin
     (1, 18, 'Haldirams Bhujia',              65.00,  60.00,  30, 10, true),
     (1, 20, 'Banana Chips 200g',             80.00,  75.00,  40, 10, true),
     (1, 21, 'Jackfruit Chips',               90.00,  85.00,  20,  5, true),
+    -- Only shop carrying these two
+    (1, 65, 'Lays Magic Masala',             20.00,  20.00,  70, 15, true),
+    (1, 68, 'Red Bull 250ml',               125.00, 120.00,  24,  6, true),
+    -- Bigger pack option, same two flavours
+    (1, 69, 'Lays Salted 90g',                45.00,  42.00,  35, 10, true),
+    (1, 70, 'Lays Magic Masala 90g',          45.00,  42.00,  30, 10, true),
     -- Rice & Grains
     (1, 22, 'Jaya Rice 5kg',               320.00, 310.00,  30,  5, true),
     (1, 23, 'Matta 5kg',                   380.00, 365.00,  25,  5, true),
@@ -329,7 +366,7 @@ INSERT INTO shop_product (shop_id, catalog_id, local_name, regular_price, sellin
     (1, 62, 'Puttu Powder 1kg',              52.00,  48.00,  30, 10, true),
     (1, 63, 'Rice Powder 1kg',               45.00,  42.00,  25, 10, true);
 
--- Shop 2: Maveli Stores (mid-size, Kerala-focused, messier naming)
+-- Shop 2: We Mart (hypermarket on Infopark Road, messier naming)
 INSERT INTO shop_product (shop_id, catalog_id, local_name, regular_price, selling_price, stock_quantity, low_stock_threshold, is_available) VALUES
     -- Biscuits (just brand names, no sizes)
     (2, 1,  'Parle G Big Pack',             110.00, 100.00,  30, 10, true),
@@ -375,9 +412,12 @@ INSERT INTO shop_product (shop_id, catalog_id, local_name, regular_price, sellin
     -- Flour (Kerala specialties)
     (2, 62, 'Puttu Podi',                    52.00,  50.00,  40, 10, true),
     (2, 63, 'Rice Flour',                    45.00,  43.00,  35, 10, true),
-    (2, 64, 'Appam Powder',                  55.00,  52.00,  25, 10, true);
+    (2, 64, 'Appam Powder',                  55.00,  52.00,  25, 10, true),
+    -- Only shop carrying these two
+    (2, 66, 'Moru Bottle',               20.00,  19.00,  30, 10, true),
+    (2, 67, 'Hot n Sweet Lays',              20.00,  20.00,  35, 10, true);
 
--- Shop 3: Lakshmi Grocery (small neighbourhood shop, very casual naming)
+-- Shop 3: Centreal Bazaar (neighbourhood chain, very casual naming)
 INSERT INTO shop_product (shop_id, catalog_id, local_name, regular_price, selling_price, stock_quantity, low_stock_threshold, is_available) VALUES
     -- Biscuits (bare minimum names)
     (3, 1,  'Parle G',                     110.00, 105.00,  15, 5, true),
@@ -415,16 +455,38 @@ INSERT INTO shop_product (shop_id, catalog_id, local_name, regular_price, sellin
     (3, 63, 'Rice Powder',                   45.00,  45.00,  15,  5, true),
     (3, 64, 'Appam Mix',                     55.00,  55.00,  15,  5, true);
 
+-- Shop 4: More Supermarket (chain; names arrive from its own POS, so they are
+-- tidy and consistent in a way a hand-keyed shelf label never is)
+INSERT INTO shop_product (shop_id, catalog_id, local_name, regular_price, selling_price, stock_quantity, low_stock_threshold, is_available) VALUES
+    -- Biscuits
+    (4, 1,  'Parle-G Gold 1kg',             110.00, 104.00,  45, 10, true),
+    (4, 2,  'Britannia Good Day Cashew 200g',45.00,  43.00,  38, 10, true),
+    (4, 4,  'Britannia Marie Gold 250g',     35.00,  33.00,  52, 10, true),
+    (4, 5,  'Cadbury Oreo 120g',             30.00,  29.00,  40, 10, true),
+    -- Beverages
+    (4, 8,  'Tropicana Orange 1L',          120.00, 115.00,  18,  5, true),
+    (4, 12, 'Coca-Cola 750ml',               45.00,  43.00,  60, 12, true),
+    (4, 14, 'Thums Up 750ml',                45.00,  43.00,  55, 12, true),
+    -- Snacks
+    (4, 16, 'Lay''s Classic Salted 52g',     20.00,  20.00,  75, 15, true),
+    (4, 17, 'Kurkure Masala Munch 100g',     30.00,  29.00,  44, 10, true),
+    -- Staples & dairy
+    (4, 22, 'Jaya Rice 5kg',                330.00, 318.00,  22,  5, true),
+    (4, 61, 'Aashirvaad Atta 5kg',          310.00, 295.00,  20,  5, true),
+    (4, 31, 'Milma Toned Milk 500ml',        27.00,  27.00,  40, 10, true),
+    (4, 33, 'Milma Set Curd 400g',           32.00,  31.00,  25,  8, true);
+
 -- ============================================================
 -- SHOP USERS (one owner per shop for the hackathon)
 -- ============================================================
 
 INSERT INTO shop_user (id, shop_id, username, name, phone, role) VALUES
-    (1, 1, 'suresh',  'Suresh Kumar',  '919847100001', 'owner'),
-    (2, 2, 'anil',    'Anil Menon',    '919847100002', 'owner'),
-    (3, 3, 'geetha',  'Geetha Nair',   '919847100003', 'owner');
+    (1, 1, 'john',    'John Mathew',   '919847100001', 'owner'),
+    (2, 2, 'hari',    'Hari Menon',    '919847100002', 'owner'),
+    (3, 3, 'asif',    'Asif Rahman',   '919847100003', 'owner'),
+    (4, 4, 'geetha',  'Geetha Nair',   '919847100004', 'owner');
 
-SELECT setval('shop_user_id_seq', 3);
+SELECT setval('shop_user_id_seq', 4);
 
 -- ---------------------------------------------------------------------------
 -- Demo orders
@@ -436,57 +498,58 @@ SELECT setval('shop_user_id_seq', 3);
 -- produces that state.
 --
 -- Every stage is represented so the dashboard, the work queue and the history
--- screen all have something to show without waiting on the agent.
+-- screen all have something to show without waiting on the agent. Split
+-- across FineMart (shop 1) and We Mart (shop 2) so both dashboards have
+-- something to show. Customers are the anonymous, name-less rows above —
+-- order_item joins by (shop_id, catalog_id), not a hardcoded shop_product.id,
+-- since those serials shift with insertion order.
 -- ---------------------------------------------------------------------------
 
 INSERT INTO master_order
   (order_code, customer_id, address_id, status, payment_mode, delivery_type,
    delivery_note, product_amount, delivery_fee, total_amount, trace_id, created_at)
 VALUES
-  ('ORD-1043', 3, 6, 'accepted', 'cod', 'pickup',   NULL,               121.00, 0, 121.00, 'trc_1043', NOW() - interval '70 minutes'),
-  ('ORD-1042', 1, 4, 'accepted', 'cod', 'delivery', 'no onions please', 297.00, 0, 297.00, 'trc_1042', NOW() - interval '4 minutes'),
-  ('ORD-1041', 2, 5, 'accepted', 'cod', 'delivery', NULL,               182.00, 0, 182.00, 'trc_1041', NOW() - interval '13 minutes'),
-  ('ORD-1040', 3, 6, 'accepted', 'cod', 'pickup',   NULL,                64.00, 0,  64.00, 'trc_1040', NOW() - interval '41 minutes'),
-  ('ORD-1039', 1, 4, 'accepted', 'cod', 'delivery', 'second floor, ring the bell', 215.00, 0, 215.00, 'trc_1039', NOW() - interval '2 hours'),
-  ('ORD-1038', 2, 5, 'accepted', 'cod', 'delivery', NULL,               138.00, 0, 138.00, 'trc_1038', NOW() - interval '5 hours'),
-  ('ORD-1037', 3, 6, 'accepted', 'cod', 'delivery', 'call before coming', 268.00, 0, 268.00, 'trc_1037', NOW() - interval '26 hours'),
-  ('ORD-1036', 1, 4, 'accepted', 'cod', 'pickup',   NULL,                99.00, 0,  99.00, 'trc_1036', NOW() - interval '28 hours'),
-  ('ORD-1035', 2, 5, 'rejected', 'cod', 'delivery', NULL,                84.00, 0,  84.00, 'trc_1035', NOW() - interval '30 hours');
+  ('ORD-2001', 1, 5, 'accepted', 'cod',  'delivery', NULL,                 0, 0, 0, 'trc_2001', NOW() - interval '10 minutes'),
+  ('ORD-2002', 2, 6, 'accepted', 'gpay', 'delivery', 'leave at the door',  0, 0, 0, 'trc_2002', NOW() - interval '45 minutes'),
+  ('ORD-2003', 3, 7, 'accepted', 'cod',  'pickup',   NULL,                 0, 0, 0, 'trc_2003', NOW() - interval '5 hours'),
+  ('ORD-2004', 1, 5, 'accepted', 'cod',  'delivery', NULL,                 0, 0, 0, 'trc_2004', NOW() - interval '20 minutes'),
+  ('ORD-2005', 2, 6, 'accepted', 'gpay', 'delivery', NULL,                 0, 0, 0, 'trc_2005', NOW() - interval '90 minutes'),
+  ('ORD-2006', 3, 7, 'rejected', 'cod',  'delivery', NULL,                 0, 0, 0, 'trc_2006', NOW() - interval '6 hours');
 
 INSERT INTO fulfillment
   (master_order_id, shop_id, status, subtotal,
    accepted_at, packed_at, out_for_delivery_at, delivered_at, rejected_at, rejection_reason, updated_at)
-SELECT m.id, 1, v.status, v.subtotal,
+SELECT m.id, v.shop_id, v.status, 0,
        v.accepted_at, v.packed_at, v.out_at, v.delivered_at, v.rejected_at, v.reason,
        COALESCE(v.delivered_at, v.rejected_at, v.out_at, v.packed_at, v.accepted_at)
 FROM (VALUES
-  ('ORD-1043','out_for_delivery',121.00, NOW() - interval '70 minutes', NOW() - interval '58 minutes', NOW() - interval '44 minutes', NULL, NULL, NULL),
-  ('ORD-1042','accepted',        297.00, NOW() - interval '4 minutes',  NULL, NULL, NULL, NULL, NULL),
-  ('ORD-1041','accepted',        182.00, NOW() - interval '13 minutes', NULL, NULL, NULL, NULL, NULL),
-  ('ORD-1040','packed',           64.00, NOW() - interval '41 minutes', NOW() - interval '31 minutes', NULL, NULL, NULL, NULL),
-  ('ORD-1039','out_for_delivery',215.00, NOW() - interval '2 hours',    NOW() - interval '105 minutes', NOW() - interval '80 minutes', NULL, NULL, NULL),
-  ('ORD-1038','delivered',       138.00, NOW() - interval '5 hours',    NOW() - interval '290 minutes', NOW() - interval '275 minutes', NOW() - interval '250 minutes', NULL, NULL),
-  ('ORD-1037','delivered',       268.00, NOW() - interval '26 hours',   NOW() - interval '25 hours', NOW() - interval '24 hours', NOW() - interval '23 hours', NULL, NULL),
-  ('ORD-1036','delivered',        99.00, NOW() - interval '28 hours',   NOW() - interval '27 hours', NOW() - interval '26 hours', NOW() - interval '25 hours', NULL, NULL),
-  ('ORD-1035','rejected',         84.00, NULL, NULL, NULL, NULL, NOW() - interval '30 hours', 'Out of stock for the day')
-) AS v(code,status,subtotal,accepted_at,packed_at,out_at,delivered_at,rejected_at,reason)
+  ('ORD-2001', 1, 'accepted',         NOW() - interval '10 minutes', NULL, NULL, NULL, NULL, NULL),
+  ('ORD-2002', 1, 'out_for_delivery', NOW() - interval '45 minutes', NOW() - interval '35 minutes', NOW() - interval '20 minutes', NULL, NULL, NULL),
+  ('ORD-2003', 1, 'delivered',        NOW() - interval '5 hours',    NOW() - interval '4 hours 40 minutes', NOW() - interval '4 hours 20 minutes', NOW() - interval '4 hours', NULL, NULL),
+  ('ORD-2004', 2, 'accepted',         NOW() - interval '20 minutes', NULL, NULL, NULL, NULL, NULL),
+  ('ORD-2005', 2, 'out_for_delivery', NOW() - interval '90 minutes', NOW() - interval '75 minutes', NOW() - interval '55 minutes', NULL, NULL, NULL),
+  ('ORD-2006', 2, 'rejected',         NULL, NULL, NULL, NULL, NOW() - interval '6 hours', 'Out of stock for the day')
+) AS v(code, shop_id, status, accepted_at, packed_at, out_at, delivered_at, rejected_at, reason)
 JOIN master_order m ON m.order_code = v.code;
 
 INSERT INTO order_item (fulfillment_id, shop_product_id, quantity, unit_price, total_price)
-SELECT f.id, v.sp, v.qty, sp.selling_price, sp.selling_price * v.qty
+SELECT f.id, sp.id, v.qty, sp.selling_price, sp.selling_price * v.qty
 FROM (VALUES
-  ('ORD-1043', 3, 1), ('ORD-1043', 6, 2),
-  ('ORD-1042', 1, 3), ('ORD-1041', 2, 2), ('ORD-1041', 5, 1), ('ORD-1041', 7, 1),
-  ('ORD-1040', 4, 2), ('ORD-1039', 7, 1), ('ORD-1039', 8, 1), ('ORD-1038', 6, 2),
-  ('ORD-1038', 3, 2), ('ORD-1037', 1, 2), ('ORD-1037', 7, 1), ('ORD-1036', 1, 1),
-  ('ORD-1035', 2, 2)
-) AS v(code, sp, qty)
+  -- FineMart (shop 1)
+  ('ORD-2001', 1, 1,  2), ('ORD-2001', 1, 32, 1),
+  ('ORD-2002', 1, 17, 1), ('ORD-2002', 1, 53, 1),
+  ('ORD-2003', 1, 24, 1), ('ORD-2003', 1, 43, 1),
+  -- We Mart (shop 2)
+  ('ORD-2004', 2, 28, 1), ('ORD-2004', 2, 60, 1),
+  ('ORD-2005', 2, 12, 2), ('ORD-2005', 2, 66, 1)
+) AS v(code, shop_id, catalog_id, qty)
 JOIN master_order m ON m.order_code = v.code
-JOIN fulfillment f ON f.master_order_id = m.id
-JOIN shop_product sp ON sp.id = v.sp;
+JOIN fulfillment f ON f.master_order_id = m.id AND f.shop_id = v.shop_id
+JOIN shop_product sp ON sp.shop_id = v.shop_id AND sp.catalog_id = v.catalog_id;
 
--- Keep the stored subtotal in step with the lines it is made of.
-UPDATE fulfillment f SET subtotal = t.sum
+-- Keep the stored subtotal/amounts in step with the lines they're made of
+-- (ORD-2006 was rejected before any lines were added, so it stays at 0).
+UPDATE fulfillment f SET subtotal = COALESCE(t.sum, 0)
 FROM (SELECT fulfillment_id, SUM(total_price) AS sum FROM order_item GROUP BY fulfillment_id) t
 WHERE t.fulfillment_id = f.id;
 UPDATE master_order m SET product_amount = f.subtotal, total_amount = f.subtotal
@@ -495,39 +558,25 @@ FROM fulfillment f WHERE f.master_order_id = m.id;
 INSERT INTO order_event (master_order_id, fulfillment_id, event_type, actor, note, created_at)
 SELECT m.id, f.id, v.ev, v.actor, v.note, v.at
 FROM (VALUES
-  ('ORD-1043','placed','customer',NULL, NOW() - interval '70 minutes'),
-  ('ORD-1043','status_accepted','system','Auto-accepted', NOW() - interval '70 minutes'),
-  ('ORD-1043','status_packed','retailer',NULL, NOW() - interval '58 minutes'),
-  ('ORD-1043','status_out_for_delivery','retailer','Ready at the counter', NOW() - interval '44 minutes'),
-  ('ORD-1042','placed','customer',NULL, NOW() - interval '4 minutes'),
-  ('ORD-1042','status_accepted','system','Auto-accepted', NOW() - interval '4 minutes'),
-  ('ORD-1041','placed','customer',NULL, NOW() - interval '13 minutes'),
-  ('ORD-1041','status_accepted','system','Auto-accepted', NOW() - interval '13 minutes'),
-  ('ORD-1040','placed','customer',NULL, NOW() - interval '41 minutes'),
-  ('ORD-1040','status_accepted','system','Auto-accepted', NOW() - interval '41 minutes'),
-  ('ORD-1040','status_packed','retailer','Status changed to packed', NOW() - interval '31 minutes'),
-  ('ORD-1039','placed','customer',NULL, NOW() - interval '2 hours'),
-  ('ORD-1039','status_accepted','system','Auto-accepted', NOW() - interval '2 hours'),
-  ('ORD-1039','status_packed','retailer',NULL, NOW() - interval '105 minutes'),
-  ('ORD-1039','status_out_for_delivery','retailer',NULL, NOW() - interval '80 minutes'),
-  ('ORD-1038','placed','customer',NULL, NOW() - interval '5 hours'),
-  ('ORD-1038','status_accepted','system','Auto-accepted', NOW() - interval '5 hours'),
-  ('ORD-1038','status_packed','retailer',NULL, NOW() - interval '290 minutes'),
-  ('ORD-1038','status_out_for_delivery','retailer',NULL, NOW() - interval '275 minutes'),
-  ('ORD-1038','status_delivered','retailer',NULL, NOW() - interval '250 minutes'),
-  ('ORD-1037','placed','customer',NULL, NOW() - interval '26 hours'),
-  ('ORD-1037','status_accepted','system','Auto-accepted', NOW() - interval '26 hours'),
-  ('ORD-1037','status_packed','retailer',NULL, NOW() - interval '25 hours'),
-  ('ORD-1037','status_out_for_delivery','retailer',NULL, NOW() - interval '24 hours'),
-  ('ORD-1037','status_delivered','retailer',NULL, NOW() - interval '23 hours'),
-  ('ORD-1036','placed','customer',NULL, NOW() - interval '28 hours'),
-  ('ORD-1036','status_accepted','system','Auto-accepted', NOW() - interval '28 hours'),
-  ('ORD-1036','status_packed','retailer',NULL, NOW() - interval '27 hours'),
-  ('ORD-1036','status_out_for_delivery','retailer','Ready at the counter', NOW() - interval '26 hours'),
-  ('ORD-1036','status_delivered','retailer','Collected by the customer', NOW() - interval '25 hours'),
-  ('ORD-1035','placed','customer',NULL, NOW() - interval '30 hours'),
-  ('ORD-1035','status_rejected','retailer','Out of stock for the day', NOW() - interval '30 hours')
+  ('ORD-2001','placed','customer',NULL, NOW() - interval '10 minutes'),
+  ('ORD-2001','status_accepted','system','Auto-accepted', NOW() - interval '10 minutes'),
+  ('ORD-2002','placed','customer',NULL, NOW() - interval '45 minutes'),
+  ('ORD-2002','status_accepted','system','Auto-accepted', NOW() - interval '45 minutes'),
+  ('ORD-2002','status_packed','retailer',NULL, NOW() - interval '35 minutes'),
+  ('ORD-2002','status_out_for_delivery','retailer',NULL, NOW() - interval '20 minutes'),
+  ('ORD-2003','placed','customer',NULL, NOW() - interval '5 hours'),
+  ('ORD-2003','status_accepted','system','Auto-accepted', NOW() - interval '5 hours'),
+  ('ORD-2003','status_packed','retailer',NULL, NOW() - interval '4 hours 40 minutes'),
+  ('ORD-2003','status_out_for_delivery','retailer',NULL, NOW() - interval '4 hours 20 minutes'),
+  ('ORD-2003','status_delivered','retailer',NULL, NOW() - interval '4 hours'),
+  ('ORD-2004','placed','customer',NULL, NOW() - interval '20 minutes'),
+  ('ORD-2004','status_accepted','system','Auto-accepted', NOW() - interval '20 minutes'),
+  ('ORD-2005','placed','customer',NULL, NOW() - interval '90 minutes'),
+  ('ORD-2005','status_accepted','system','Auto-accepted', NOW() - interval '90 minutes'),
+  ('ORD-2005','status_packed','retailer',NULL, NOW() - interval '75 minutes'),
+  ('ORD-2005','status_out_for_delivery','retailer',NULL, NOW() - interval '55 minutes'),
+  ('ORD-2006','placed','customer',NULL, NOW() - interval '6 hours'),
+  ('ORD-2006','status_rejected','retailer','Out of stock for the day', NOW() - interval '6 hours')
 ) AS v(code, ev, actor, note, at)
 JOIN master_order m ON m.order_code = v.code
 JOIN fulfillment f ON f.master_order_id = m.id;
-

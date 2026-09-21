@@ -137,6 +137,7 @@ export class FulfillmentService {
     return {
       id: f.id,
       masterOrderId: f.master_order_id,
+      shopName: f.shop_name,
       orderCode: f.order_code,
       status: f.status as FulfillmentStatus,
       customer: { displayName: f.customer_name, phone: f.customer_phone },
@@ -217,7 +218,7 @@ export class FulfillmentService {
     if (targetStatus === 'out_for_delivery') {
       const body = [
         '🚚 *Out for Delivery!*',
-        `Your order \`${detail.orderCode}\` is on its way!`,
+        `Your order \`${detail.orderCode}\` from *${detail.shopName}* is on its way!`,
         '',
         `📍 Delivering to: ${detail.delivery.address ?? 'your address'}`,
         '',
@@ -238,7 +239,7 @@ export class FulfillmentService {
         // the customer's order isn't fully in hand yet.
         const body = [
           '📦 *Part of your order has been delivered!*',
-          `One part of order \`${detail.orderCode}\` has arrived. The rest is still on its way — you'll hear again once everything's delivered.`,
+          `Your order from *${detail.shopName}* (order \`${detail.orderCode}\`) has arrived. The rest is still on its way — you'll hear again once everything's delivered.`,
         ].join('\n');
 
         await this.notifyService.send(detail.customer.phone, [{ type: 'text', body }], 'delivered', detail.traceId);
@@ -266,9 +267,9 @@ export class FulfillmentService {
 
     const lines = ['🧾 *Order Delivered — Summary*', `Order \`${orderCode}\``, ''];
 
-    assignments.forEach((assignment, index) => {
+    assignments.forEach((assignment) => {
       if (assignments.length > 1) {
-        lines.push(`*Store ${index + 1}:*`);
+        lines.push(`*${assignment.shopName}:*`);
       }
       for (const item of assignment.items) {
         lines.push(`• ${item.productName} x${item.quantity} — ₹${item.unitPrice * item.quantity}`);

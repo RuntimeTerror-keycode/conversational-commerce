@@ -76,6 +76,7 @@ export interface FulfillmentEvent {
 export interface FulfillmentDetail {
   id: number;
   masterOrderId: number;
+  shopName: string;
   orderCode: string;
   status: FulfillmentStatus;
   customer: FulfillmentCustomer & { phone: string };
